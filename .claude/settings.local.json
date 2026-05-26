@@ -4,7 +4,13 @@
       "Bash(npm install *)",
       "Bash(npx shadcn@latest init --defaults)",
       "Bash(npm run *)",
-      "PowerShell(Rename-Item -Path \"E:\\\\Developing\\\\Loopify\\\\vishalakshi-packaging\\\\middleware.ts\" -NewName \"proxy.ts\")"
+      "PowerShell(Rename-Item -Path \"E:\\\\Developing\\\\Loopify\\\\vishalakshi-packaging\\\\middleware.ts\" -NewName \"proxy.ts\")",
+      "WebSearch",
+      "Bash(npm update *)",
+      "mcp__dbefb8b2-4aa4-4267-8a27-e663b2174b39__list_projects",
+      "mcp__dbefb8b2-4aa4-4267-8a27-e663b2174b39__get_project_url",
+      "mcp__dbefb8b2-4aa4-4267-8a27-e663b2174b39__get_publishable_keys",
+      "mcp__dbefb8b2-4aa4-4267-8a27-e663b2174b39__execute_sql"
     ]
   }
 }

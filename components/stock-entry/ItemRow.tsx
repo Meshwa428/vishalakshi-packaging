@@ -91,7 +91,7 @@ export function ItemRow({ index, settings, onRemove, canRemove, isReadOnly }: It
         {isReadOnly ? (
           <span className="text-sm">{sizeVal || "—"}</span>
         ) : (
-          <Input {...register(`items.${index}.size`)} placeholder="e.g. 40×50" className="h-9 text-sm" />
+          <Input {...register(`items.${index}.size`)} placeholder="40" className="h-9 text-sm" />
         )}
       </td>
 

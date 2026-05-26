@@ -1,56 +1,140 @@
-import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
+"use client"
+
+import { useState, useCallback } from "react"
 import { PageHeader } from "@/components/shared/PageHeader"
-import { ReportTable } from "@/components/reports/ReportTable"
-import { MonthYearSelector } from "@/components/reports/MonthYearSelector"
-import { getCurrentMonthYear, monthName } from "@/lib/utils"
+import { StockReport } from "@/components/reports/StockReport"
+import { DateRangeSelector } from "@/components/reports/DateRangeSelector"
+import { useProfileContext } from "@/components/shared/ProfileProvider"
+import { createClient } from "@/lib/supabase/client"
 import { logger } from "@/lib/logger"
+import type { StockEntryItem, StockOutItem } from "@/types"
 
-export const dynamic = "force-dynamic"
-
-interface PageProps {
-  searchParams: Promise<{ month?: string; year?: string }>
+export interface ReportRow {
+  reel_no: string
+  date: string
+  invoice_number: string
+  party_name: string
+  gsm: string | null
+  bf: string | null
+  type: string | null
+  quality: string | null
+  size: string | null
+  stock_in_weight: number
+  stock_out_weight: number
+  balance: number
+  stock_entry_id: string
 }
 
-export default async function ReportsPage({ searchParams }: PageProps) {
-  const { month: mParam, year: yParam } = await searchParams
-  const { month: currentMonth, year: currentYear } = getCurrentMonthYear()
+type StockInItemRaw = StockEntryItem & {
+  stock_entries: { id: string; invoice_number: string; date: string; party_name: string }
+}
 
-  const month = mParam ? Number(mParam) : currentMonth
-  const year = yParam ? Number(yParam) : currentYear
+type StockOutItemRaw = StockOutItem & {
+  stock_out_entries: { id: string }
+}
 
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect("/login")
+export default function ReportsPage() {
+  const { isAdmin } = useProfileContext()
+  const [rows, setRows] = useState<ReportRow[]>([])
+  const [loading, setLoading] = useState(false)
+  const [generated, setGenerated] = useState(false)
+  const [dateRange, setDateRange] = useState<{ from: string; to: string } | null>(null)
 
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-  const isAdmin = profile?.role === "admin"
+  const handleGenerate = useCallback(async (from: string, to: string) => {
+    setLoading(true)
+    setDateRange({ from, to })
+    const supabase = createClient()
 
-  // Fetch reel items where the parent entry's date falls in the selected month/year
-  const startDate = `${year}-${String(month).padStart(2, "0")}-01`
-  const endDate = new Date(year, month, 0).toISOString().split("T")[0] // last day of month
+    try {
+      // 1. Get all stock-in items in date range
+      const { data: inItems, error: inError } = await supabase
+        .from("stock_entries")
+        .select(`id, invoice_number, date, party_name, stock_entry_items(*)`)
+        .gte("date", from)
+        .lte("date", to)
+        .order("date", { ascending: true })
 
-  const { data: items, error } = await supabase
-    .from("stock_entry_items")
-    .select(`*, stock_entries!inner(id, invoice_number, date, party_name)`)
-    .gte("stock_entries.date", startDate)
-    .lte("stock_entries.date", endDate)
-    .order("stock_entries.date", { ascending: true })
+      if (inError) { logger.error("Failed to fetch stock in for report", inError); return }
 
-  if (error) {
-    logger.error("Failed to fetch report items", error)
-  }
+      // Flatten to per-item rows
+      const flatIn: StockInItemRaw[] = (inItems ?? []).flatMap((entry) =>
+        (entry.stock_entry_items ?? []).map((item) => ({
+          ...item,
+          stock_entries: {
+            id: entry.id,
+            invoice_number: entry.invoice_number,
+            date: entry.date,
+            party_name: entry.party_name,
+          },
+        }))
+      )
 
-  logger.info("Reports page loaded", { month, year, count: items?.length ?? 0 })
+      if (flatIn.length === 0) {
+        setRows([])
+        setGenerated(true)
+        setLoading(false)
+        return
+      }
+
+      // 2. Get all stock-out items for these reel numbers
+      const reelNos = flatIn.map((i) => i.reel_no)
+      const { data: outItems, error: outError } = await supabase
+        .from("stock_out_items")
+        .select(`reel_no, weight`)
+        .in("reel_no", reelNos)
+
+      if (outError) logger.error("Failed to fetch stock out for report", outError)
+
+      // 3. Build a map: reel_no → total stock out weight
+      const outMap = new Map<string, number>()
+      ;(outItems ?? []).forEach((item: StockOutItemRaw | { reel_no: string; weight: number | null }) => {
+        const prev = outMap.get(item.reel_no) ?? 0
+        outMap.set(item.reel_no, prev + (item.weight ?? 0))
+      })
+
+      // 4. Build report rows
+      const reportRows: ReportRow[] = flatIn.map((item) => {
+        const stock_in_weight = item.weight ?? 0
+        const stock_out_weight = outMap.get(item.reel_no) ?? 0
+        return {
+          reel_no: item.reel_no,
+          date: item.stock_entries.date,
+          invoice_number: item.stock_entries.invoice_number,
+          party_name: item.stock_entries.party_name,
+          gsm: item.gsm,
+          bf: item.bf,
+          type: item.type,
+          quality: item.quality,
+          size: item.size,
+          stock_in_weight,
+          stock_out_weight,
+          balance: stock_in_weight - stock_out_weight,
+          stock_entry_id: item.stock_entries.id,
+        }
+      })
+
+      logger.info("Report generated", { from, to, rows: reportRows.length })
+      setRows(reportRows)
+      setGenerated(true)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Monthly Report"
-        description={`Reel-wise stock report — ${monthName(month)} ${year}`}
-        action={<MonthYearSelector month={month} year={year} />}
+        title="Stock Report"
+        description="Reel-wise stock in, consumption, and balance"
+        action={<DateRangeSelector onGenerate={handleGenerate} loading={loading} />}
       />
-      <ReportTable items={items ?? []} month={month} year={year} isAdmin={isAdmin} />
+      <StockReport
+        rows={rows}
+        loading={loading}
+        generated={generated}
+        dateRange={dateRange}
+        isAdmin={isAdmin}
+      />
     </div>
   )
 }

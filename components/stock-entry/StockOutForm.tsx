@@ -13,16 +13,16 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { ItemRow } from "@/components/stock-entry/ItemRow"
+import { StockOutItemRow } from "@/components/stock-entry/StockOutItemRow"
 import { createClient } from "@/lib/supabase/client"
 import { logger } from "@/lib/logger"
-import type { AppSettings, StockEntry, StockEntryItem, EntryStatus } from "@/types"
+import type { AppSettings, StockOutEntry, StockOutItem, EntryStatus } from "@/types"
 
-const itemSchema = z.object({
+const stockOutItemSchema = z.object({
+  gsm: z.string().min(1, "GSM is required"),
   reel_no: z.string().min(1, "Reel number is required"),
   size: z.string(),
   type: z.string(),
-  gsm: z.string(),
   bf: z.string(),
   quality: z.string(),
   weight: z.number().nullable().optional(),
@@ -35,19 +35,19 @@ const formSchema = z.object({
   party_name: z.string().min(1, "Party name is required"),
   shipped_from: z.string(),
   delivery_address: z.string(),
-  items: z.array(itemSchema).min(1, "At least one reel entry is required"),
+  items: z.array(stockOutItemSchema).min(1, "At least one reel entry is required"),
 })
 
 type FormData = z.infer<typeof formSchema>
 
-interface EntryFormProps {
+interface StockOutFormProps {
   settings: AppSettings
-  existingEntry?: StockEntry & { stock_entry_items: StockEntryItem[] }
+  existingEntry?: StockOutEntry & { stock_out_items: StockOutItem[] }
   isEdit?: boolean
 }
 
 const emptyItem = (): FormData["items"][0] => ({
-  reel_no: "", size: "", type: "", gsm: "", bf: "", quality: "", weight: null,
+  gsm: "", reel_no: "", size: "", type: "", bf: "", quality: "", weight: null,
 })
 
 function TotalsRow({ control }: { control: ReturnType<typeof useForm<FormData>>["control"] }) {
@@ -55,15 +55,21 @@ function TotalsRow({ control }: { control: ReturnType<typeof useForm<FormData>>[
   const totalWeight = items.reduce((sum, item) => sum + (Number(item?.weight) || 0), 0)
   return (
     <tr className="border-t bg-muted/30">
-      <td className="py-2.5 px-2 text-xs font-medium text-muted-foreground" colSpan={2}>Total</td>
-      <td className="py-2.5 px-2 text-xs font-medium" colSpan={4}>{items.length} reel{items.length !== 1 ? "s" : ""}</td>
-      <td className="py-2.5 px-2 text-xs font-medium">{totalWeight.toFixed(2)} kg</td>
+      <td className="py-2.5 px-3 text-xs font-medium text-muted-foreground" colSpan={2}>
+        Total
+      </td>
+      <td className="py-2.5 px-2 text-xs font-medium" colSpan={5}>
+        {items.length} reel{items.length !== 1 ? "s" : ""}
+      </td>
+      <td className="py-2.5 px-2 text-xs font-medium">
+        {totalWeight.toFixed(2)} kg
+      </td>
       <td />
     </tr>
   )
 }
 
-export function EntryForm({ settings, existingEntry, isEdit }: EntryFormProps) {
+export function StockOutForm({ settings, existingEntry, isEdit }: StockOutFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState<"draft" | "done" | null>(null)
 
@@ -76,11 +82,11 @@ export function EntryForm({ settings, existingEntry, isEdit }: EntryFormProps) {
       party_name: existingEntry.party_name,
       shipped_from: existingEntry.shipped_from ?? "",
       delivery_address: existingEntry.delivery_address ?? "",
-      items: existingEntry.stock_entry_items.map((i) => ({
+      items: existingEntry.stock_out_items.map((i) => ({
+        gsm: i.gsm ?? "",
         reel_no: i.reel_no,
         size: i.size ?? "",
         type: i.type ?? "",
-        gsm: i.gsm ?? "",
         bf: i.bf ?? "",
         quality: i.quality ?? "",
         weight: i.weight,
@@ -101,16 +107,15 @@ export function EntryForm({ settings, existingEntry, isEdit }: EntryFormProps) {
 
   const onSubmit = async (data: FormData, status: EntryStatus) => {
     setLoading(status)
-    logger.info("Submitting stock entry", { invoiceNo: data.invoice_number, status, isEdit })
+    logger.info("Submitting stock out entry", { invoiceNo: data.invoice_number, status })
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { toast.error("Session expired. Please sign in again."); return }
 
       if (isEdit && existingEntry) {
-        // Update header
         const { error: headerError } = await supabase
-          .from("stock_entries")
+          .from("stock_out_entries")
           .update({
             invoice_number: data.invoice_number,
             date: data.date,
@@ -124,30 +129,26 @@ export function EntryForm({ settings, existingEntry, isEdit }: EntryFormProps) {
           .eq("id", existingEntry.id)
 
         if (headerError) {
-          logger.error("Failed to update stock entry header", headerError)
+          logger.error("Failed to update stock out entry", headerError)
           toast.error("Failed to save changes. Please try again.")
           return
         }
 
-        // Delete old items and re-insert
-        await supabase.from("stock_entry_items").delete().eq("stock_entry_id", existingEntry.id)
-        const { error: itemsError } = await supabase.from("stock_entry_items").insert(
-          data.items.map((item) => ({ ...item, stock_entry_id: existingEntry.id, weight: item.weight ?? null }))
+        await supabase.from("stock_out_items").delete().eq("stock_out_entry_id", existingEntry.id)
+        const { error: itemsError } = await supabase.from("stock_out_items").insert(
+          data.items.map((item) => ({ ...item, stock_out_entry_id: existingEntry.id, weight: item.weight ?? null }))
         )
-
         if (itemsError) {
-          logger.error("Failed to update stock entry items", itemsError)
-          toast.error("Entry header saved but reel details failed. Please edit again.")
+          logger.error("Failed to update stock out items", itemsError)
+          toast.error("Entry saved but reel details failed. Please edit again.")
           return
         }
 
-        logger.info("Stock entry updated", { id: existingEntry.id, status })
-        toast.success(status === "done" ? "Entry submitted successfully!" : "Draft saved successfully!")
-        router.push(`/stock-entries/${existingEntry.id}`)
+        toast.success(status === "done" ? "Stock Out entry updated!" : "Draft saved!")
+        router.push(`/stock-entries/${existingEntry.id}?type=stock_out`)
       } else {
-        // Create new entry
         const { data: entry, error: headerError } = await supabase
-          .from("stock_entries")
+          .from("stock_out_entries")
           .insert({
             invoice_number: data.invoice_number,
             date: data.date,
@@ -162,28 +163,25 @@ export function EntryForm({ settings, existingEntry, isEdit }: EntryFormProps) {
           .single()
 
         if (headerError || !entry) {
-          logger.error("Failed to create stock entry", headerError)
+          logger.error("Failed to create stock out entry", headerError)
           if (headerError?.code === "23505") {
-            toast.error(`Invoice number "${data.invoice_number}" already exists. Please use a unique invoice number.`)
+            toast.error(`Invoice number "${data.invoice_number}" already exists.`)
           } else {
             toast.error("Failed to create entry. Please try again.")
           }
           return
         }
 
-        const { error: itemsError } = await supabase.from("stock_entry_items").insert(
-          data.items.map((item) => ({ ...item, stock_entry_id: entry.id, weight: item.weight ?? null }))
+        const { error: itemsError } = await supabase.from("stock_out_items").insert(
+          data.items.map((item) => ({ ...item, stock_out_entry_id: entry.id, weight: item.weight ?? null }))
         )
-
         if (itemsError) {
-          logger.error("Failed to insert stock entry items", itemsError)
-          await supabase.from("stock_entries").delete().eq("id", entry.id)
+          await supabase.from("stock_out_entries").delete().eq("id", entry.id)
           toast.error("Failed to save reel details. Please try again.")
           return
         }
 
-        logger.info("Stock entry created", { id: entry.id, status })
-        toast.success(status === "done" ? "Stock entry created successfully!" : "Draft saved! You can complete it later.")
+        toast.success(status === "done" ? "Stock Out entry created!" : "Draft saved! Complete it later.")
         router.push("/stock-entries")
       }
     } finally {
@@ -196,7 +194,6 @@ export function EntryForm({ settings, existingEntry, isEdit }: EntryFormProps) {
   return (
     <FormProvider {...methods}>
       <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
-        {/* Header details */}
         <Card>
           <CardHeader className="pb-4">
             <CardTitle className="text-base">Entry Details</CardTitle>
@@ -208,29 +205,24 @@ export function EntryForm({ settings, existingEntry, isEdit }: EntryFormProps) {
                 <Input id="invoice_number" placeholder="001" {...register("invoice_number")} />
                 {errors.invoice_number && <p className="text-xs text-destructive">{errors.invoice_number.message}</p>}
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="date">Date *</Label>
                 <Input id="date" type="date" {...register("date")} />
                 {errors.date && <p className="text-xs text-destructive">{errors.date.message}</p>}
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="truck_number">Truck Number</Label>
                 <Input id="truck_number" placeholder="GJ 18 VA 5423" {...register("truck_number")} />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="party_name">Party Name *</Label>
                 <Input id="party_name" placeholder="Customer / Supplier name" {...register("party_name")} />
                 {errors.party_name && <p className="text-xs text-destructive">{errors.party_name.message}</p>}
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="shipped_from">Shipped From</Label>
                 <Input id="shipped_from" placeholder="Origin location" {...register("shipped_from")} />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="delivery_address">Delivery Address</Label>
                 <Input id="delivery_address" placeholder="Delivery location" {...register("delivery_address")} />
@@ -239,20 +231,12 @@ export function EntryForm({ settings, existingEntry, isEdit }: EntryFormProps) {
           </CardContent>
         </Card>
 
-        {/* Reel Items */}
         <Card>
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">Reel Details</CardTitle>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => append(emptyItem())}
-                className="gap-1.5"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Add Reel
+              <Button type="button" variant="outline" size="sm" onClick={() => append(emptyItem())} className="gap-1.5">
+                <Plus className="h-3.5 w-3.5" />Add Reel
               </Button>
             </div>
           </CardHeader>
@@ -261,20 +245,21 @@ export function EntryForm({ settings, existingEntry, isEdit }: EntryFormProps) {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/50">
+                    <th className="text-left text-xs font-medium text-muted-foreground py-2.5 px-3 w-10">#</th>
+                    <th className="text-left text-xs font-medium text-muted-foreground py-2.5 px-2">GSM *</th>
                     <th className="text-left text-xs font-medium text-muted-foreground py-2.5 px-2">Reel No *</th>
                     <th className="text-left text-xs font-medium text-muted-foreground py-2.5 px-2">Size</th>
                     <th className="text-left text-xs font-medium text-muted-foreground py-2.5 px-2">Type</th>
-                    <th className="text-left text-xs font-medium text-muted-foreground py-2.5 px-2">GSM</th>
                     <th className="text-left text-xs font-medium text-muted-foreground py-2.5 px-2">BF</th>
                     <th className="text-left text-xs font-medium text-muted-foreground py-2.5 px-2">Quality</th>
                     <th className="text-left text-xs font-medium text-muted-foreground py-2.5 px-2">Weight (kg)</th>
-                    <th className="py-2.5 px-2"></th>
+                    <th className="py-2.5 px-2" />
                   </tr>
                 </thead>
                 <tbody>
                   <AnimatePresence initial={false}>
                     {fields.map((field, index) => (
-                      <ItemRow
+                      <StockOutItemRow
                         key={field.id}
                         index={index}
                         settings={settings}
@@ -296,53 +281,18 @@ export function EntryForm({ settings, existingEntry, isEdit }: EntryFormProps) {
         <Separator />
 
         <div className="flex flex-col-reverse sm:flex-row justify-end gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => router.back()}
-            className="cursor-pointer"
-            disabled={loading !== null}
-          >
+          <Button type="button" variant="outline" onClick={() => router.back()} disabled={loading !== null} className="cursor-pointer">
             Cancel
           </Button>
-
-          {/* Save as Draft — always available unless editing a done entry */}
           {(!isEdit || isDraftEntry) && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => handleSubmit((data) => onSubmit(data, "draft"))()}
-              disabled={loading !== null}
-              className="gap-2 cursor-pointer"
-            >
-              {loading === "draft" ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <FileText className="h-4 w-4" />
-              )}
+            <Button type="button" variant="outline" onClick={() => handleSubmit((data) => onSubmit(data, "draft"))()} disabled={loading !== null} className="gap-2 cursor-pointer">
+              {loading === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
               Save as Draft
             </Button>
           )}
-
-          {/* Submit / Create Entry */}
-          <Button
-            type="button"
-            onClick={() => handleSubmit((data) => onSubmit(data, "done"))()}
-            disabled={loading !== null}
-            className="gap-2 cursor-pointer"
-          >
-            {loading === "done" ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : isEdit && isDraftEntry ? (
-              <CheckCircle className="h-4 w-4" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
-            {isEdit
-              ? isDraftEntry
-                ? "Submit Entry"
-                : "Save Changes"
-              : "Create Entry"}
+          <Button type="button" onClick={() => handleSubmit((data) => onSubmit(data, "done"))()} disabled={loading !== null} className="gap-2 cursor-pointer">
+            {loading === "done" ? <Loader2 className="h-4 w-4 animate-spin" /> : isEdit && isDraftEntry ? <CheckCircle className="h-4 w-4" /> : <Save className="h-4 w-4" />}
+            {isEdit ? isDraftEntry ? "Submit Entry" : "Save Changes" : "Create Entry"}
           </Button>
         </div>
       </form>

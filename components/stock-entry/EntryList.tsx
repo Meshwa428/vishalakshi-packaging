@@ -9,10 +9,10 @@ import { Badge } from "@/components/ui/badge"
 import { buttonVariants } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { formatDate, cn } from "@/lib/utils"
-import type { StockEntry } from "@/types"
+import type { UnifiedListEntry } from "@/types"
 
 interface EntryListProps {
-  entries: StockEntry[]
+  entries: UnifiedListEntry[]
   isAdmin: boolean
   loading?: boolean
 }
@@ -35,7 +35,7 @@ export function EntryList({ entries, isAdmin, loading }: EntryListProps) {
     return (
       <div className="space-y-3">
         {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-16 w-full rounded-lg" />
+          <Skeleton key={i} className="h-14 w-full rounded-lg" />
         ))}
       </div>
     )
@@ -67,13 +67,15 @@ export function EntryList({ entries, isAdmin, loading }: EntryListProps) {
                 <th className="text-left text-xs font-medium text-muted-foreground py-3 px-4 hidden sm:table-cell">Party Name</th>
                 <th className="text-left text-xs font-medium text-muted-foreground py-3 px-4 hidden md:table-cell">Truck No</th>
                 <th className="text-left text-xs font-medium text-muted-foreground py-3 px-4 hidden lg:table-cell">Reels</th>
-                <th className="py-3 px-4"></th>
+                <th className="text-left text-xs font-medium text-muted-foreground py-3 px-4">Type</th>
+                <th className="text-left text-xs font-medium text-muted-foreground py-3 px-4">Status</th>
+                <th className="py-3 px-4" />
               </tr>
             </thead>
             <tbody>
               {filtered.map((entry, i) => (
                 <motion.tr
-                  key={entry.id}
+                  key={`${entry.entry_type}-${entry.id}`}
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.03, duration: 0.2 }}
@@ -90,16 +92,44 @@ export function EntryList({ entries, isAdmin, loading }: EntryListProps) {
                     )}
                   </td>
                   <td className="py-3 px-4 hidden lg:table-cell">
-                    <Badge variant="outline">{entry.stock_entry_items?.length ?? 0} reels</Badge>
+                    <Badge variant="outline">{entry.items_count} reels</Badge>
+                  </td>
+                  <td className="py-3 px-4">
+                    {entry.entry_type === "stock_in" ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-500 border border-emerald-500/20">
+                        Stock In
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/15 text-red-500 border border-red-500/20">
+                        Stock Out
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-3 px-4">
+                    {entry.status === "draft" ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/15 text-amber-500 border border-amber-500/20">
+                        Draft
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground border border-border">
+                        Done
+                      </span>
+                    )}
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex items-center justify-end gap-1">
-                      <Link href={`/stock-entries/${entry.id}`} className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "h-8 gap-1")}>
+                      <Link
+                        href={`/stock-entries/${entry.id}?type=${entry.entry_type}`}
+                        className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "h-8 gap-1")}
+                      >
                         <Eye className="h-3.5 w-3.5" />
                         <span className="hidden sm:inline">View</span>
                       </Link>
                       {isAdmin && (
-                        <Link href={`/stock-entries/${entry.id}?edit=true`} className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "h-8 gap-1")}>
+                        <Link
+                          href={`/stock-entries/${entry.id}?type=${entry.entry_type}&edit=true`}
+                          className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "h-8 gap-1")}
+                        >
                           <Edit2 className="h-3.5 w-3.5" />
                           <span className="hidden sm:inline">Edit</span>
                         </Link>

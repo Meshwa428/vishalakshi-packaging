@@ -80,29 +80,36 @@ export function LoginForm() {
         </div>
 
         <Card>
-          <CardHeader className="pb-4">
-            <CardTitle className="text-xl">Sign in</CardTitle>
-            <CardDescription>Enter your credentials to access your account</CardDescription>
+          <CardHeader className="px-6 pt-6 pb-2">
+            <CardTitle className="text-2xl font-semibold">Sign in</CardTitle>
+            <CardDescription className="text-sm mt-1">
+              Enter your credentials to access your account
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email address</Label>
+          <CardContent className="px-6 pb-6 pt-4">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+              <div className="space-y-1.5">
+                <Label htmlFor="email" className="text-sm font-medium">
+                  Email address
+                </Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="you@example.com"
                   autoComplete="email"
                   disabled={loading}
+                  className="h-10"
                   {...register("email")}
                 />
                 {errors.email && (
-                  <p className="text-xs text-destructive">{errors.email.message}</p>
+                  <p className="text-xs text-destructive mt-1">{errors.email.message}</p>
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="password" className="text-sm font-medium">
+                  Password
+                </Label>
                 <div className="relative">
                   <Input
                     id="password"
@@ -110,7 +117,7 @@ export function LoginForm() {
                     placeholder="••••••••"
                     autoComplete="current-password"
                     disabled={loading}
-                    className="pr-10"
+                    className="h-10 pr-10"
                     {...register("password")}
                   />
                   <button
@@ -123,11 +130,11 @@ export function LoginForm() {
                   </button>
                 </div>
                 {errors.password && (
-                  <p className="text-xs text-destructive">{errors.password.message}</p>
+                  <p className="text-xs text-destructive mt-1">{errors.password.message}</p>
                 )}
               </div>
 
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button type="submit" className="w-full h-10 mt-2 cursor-pointer" disabled={loading}>
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

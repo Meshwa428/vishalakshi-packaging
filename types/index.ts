@@ -1,4 +1,6 @@
 export type Role = 'admin' | 'operator'
+export type EntryStatus = 'draft' | 'done'
+export type EntryType = 'stock_in' | 'stock_out'
 
 export interface Profile {
   id: string
@@ -6,6 +8,8 @@ export interface Profile {
   role: Role
   created_at: string
 }
+
+// ─── Stock In ───────────────────────────────────────────────────────────────
 
 export interface StockEntry {
   id: string
@@ -15,6 +19,7 @@ export interface StockEntry {
   party_name: string
   shipped_from: string | null
   delivery_address: string | null
+  status: EntryStatus
   created_by: string
   created_at: string
   updated_at: string
@@ -34,6 +39,52 @@ export interface StockEntryItem {
   weight: number | null
   created_at: string
 }
+
+// ─── Stock Out ──────────────────────────────────────────────────────────────
+
+export interface StockOutEntry {
+  id: string
+  invoice_number: string
+  date: string
+  truck_number: string | null
+  party_name: string
+  shipped_from: string | null
+  delivery_address: string | null
+  status: EntryStatus
+  created_by: string
+  created_at: string
+  updated_at: string
+  profiles?: Profile
+  stock_out_items?: StockOutItem[]
+}
+
+export interface StockOutItem {
+  id: string
+  stock_out_entry_id: string
+  reel_no: string
+  gsm: string | null
+  size: string | null
+  type: string | null
+  bf: string | null
+  quality: string | null
+  weight: number | null
+  created_at: string
+}
+
+// ─── Unified list entry (merges Stock In + Stock Out for the list view) ─────
+
+export interface UnifiedListEntry {
+  id: string
+  invoice_number: string
+  date: string
+  truck_number: string | null
+  party_name: string
+  status: EntryStatus
+  entry_type: EntryType
+  items_count: number
+}
+
+// ─── Settings ────────────────────────────────────────────────────────────────
 
 export interface AppSetting {
   id: string

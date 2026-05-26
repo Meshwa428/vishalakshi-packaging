@@ -5,25 +5,23 @@ import { usePathname, useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { Package, BarChart2, Settings, LogOut, Menu } from "lucide-react"
 import { Button, buttonVariants } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { ThemeToggle } from "@/components/shared/ThemeToggle"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { createClient } from "@/lib/supabase/client"
+import { useProfileContext } from "@/components/shared/ProfileProvider"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
-import type { Profile } from "@/types"
-
-interface DashboardNavProps {
-  profile: Profile
-}
 
 const navItems = [
   { href: "/stock-entries", label: "Stock Entry", icon: Package },
   { href: "/reports", label: "Reports", icon: BarChart2 },
 ]
 
-export function DashboardNav({ profile }: DashboardNavProps) {
+export function DashboardNav() {
   const pathname = usePathname()
   const router = useRouter()
+  const { profile, loading, isAdmin } = useProfileContext()
 
   const handleLogout = async () => {
     const supabase = createClient()
@@ -35,7 +33,7 @@ export function DashboardNav({ profile }: DashboardNavProps) {
 
   const allItems = [
     ...navItems,
-    ...(profile.role === "admin" ? [{ href: "/settings", label: "Settings", icon: Settings }] : []),
+    ...(isAdmin ? [{ href: "/settings", label: "Settings", icon: Settings }] : []),
   ]
 
   const NavLinks = () => (
@@ -80,7 +78,14 @@ export function DashboardNav({ profile }: DashboardNavProps) {
             </Link>
             {/* Desktop Nav */}
             <nav className="hidden md:flex items-center gap-1">
-              <NavLinks />
+              {loading ? (
+                <div className="flex items-center gap-1">
+                  <Skeleton className="h-8 w-24 rounded-md" />
+                  <Skeleton className="h-8 w-20 rounded-md" />
+                </div>
+              ) : (
+                <NavLinks />
+              )}
             </nav>
           </div>
 
@@ -88,7 +93,11 @@ export function DashboardNav({ profile }: DashboardNavProps) {
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <div className="hidden sm:flex items-center gap-3">
-              <span className="text-sm text-muted-foreground">{profile.full_name}</span>
+              {loading ? (
+                <Skeleton className="h-4 w-24 rounded" />
+              ) : (
+                <span className="text-sm text-muted-foreground">{profile?.full_name}</span>
+              )}
               <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-1.5 cursor-pointer">
                 <LogOut className="h-4 w-4" />
                 Sign out
@@ -105,10 +114,21 @@ export function DashboardNav({ profile }: DashboardNavProps) {
               <SheetContent side="right" className="w-64">
                 <div className="flex flex-col gap-4 mt-6">
                   <nav className="flex flex-col gap-1">
-                    <NavLinks />
+                    {loading ? (
+                      <div className="space-y-1">
+                        <Skeleton className="h-9 w-full rounded-md" />
+                        <Skeleton className="h-9 w-full rounded-md" />
+                      </div>
+                    ) : (
+                      <NavLinks />
+                    )}
                   </nav>
                   <div className="pt-4 border-t">
-                    <p className="text-sm text-muted-foreground mb-3">{profile.full_name}</p>
+                    {loading ? (
+                      <Skeleton className="h-4 w-28 mb-3 rounded" />
+                    ) : (
+                      <p className="text-sm text-muted-foreground mb-3">{profile?.full_name}</p>
+                    )}
                     <Button variant="outline" size="sm" onClick={handleLogout} className="w-full gap-1.5">
                       <LogOut className="h-4 w-4" />
                       Sign out

@@ -54,6 +54,31 @@ Update after every major change so future debugging sessions have full context.
 - **Email**: Resend API with SheetJS `.xlsx` attachment to `BACKUP_EMAIL` env
 - **Keep-alive bonus**: Daily cron prevents Supabase free-tier from pausing due to inactivity
 
+### [2026-05-26] Stock In / Stock Out Architecture
+- **Two separate entry types**: Stock In = receiving reels; Stock Out = consuming/dispatching reels
+- **Separate tables**: `stock_entries` + `stock_entry_items` (Stock In); `stock_out_entries` + `stock_out_items` (Stock Out)
+- **Why separate tables**: Different item schemas. Stock Out items have GSM-first selection flow (GSM → Reel No dropdown) instead of free-text reel entry. Clean separation of concerns.
+- **Reel No is UNIQUE** in `stock_entry_items` — each physical reel enters the system exactly once. Stock Out references reel_no as a text key (not FK) and can reference the same reel multiple times across different consumption invoices.
+- **Entry list**: Merges both tables client-side, sorted by date. URL includes `?type=stock_in` or `?type=stock_out` to tell the detail page which table to query.
+- **Stock Out item row**: Selecting GSM triggers a live Supabase query to fetch matching reels. Selecting a reel auto-fills Size, Type, BF, Quality (read-only from stock record).
+- **Totals row**: Both forms show a live-updating totals tfoot row (count + weight).
+- **Draft system**: Both entry types support `status = 'draft' | 'done'`. Draft entries show amber banner; admin sees "Edit & Submit" button.
+
+### [2026-05-26] Stock Report (replaced Monthly Report)
+- **Title change**: "Monthly Report" → "Stock Report"
+- **Date filter**: Replaced month/year selector with free date range (from → to) + Generate button. Shows a placeholder state before first generate.
+- **Report logic**: Queries `stock_entries` by date range, flattens to per-item rows, then cross-references `stock_out_items` by `reel_no` to compute stock out totals.
+- **Columns**: Reel No, Date, Invoice No, Party Name, GSM, BF, Type, Quality + Stock In (green +), Stock Out (red −), Balance
+- **Totals footer**: Sum of all three weight columns across visible rows.
+- **Why client-side join**: Supabase JS client doesn't reliably support filtering/aggregating on embedded tables. Fetching both datasets and merging in JS is simpler and faster for this scale.
+
+### [2026-05-26] Client-Side Navigation (instant page transitions)
+- **Problem**: Server components caused visible delay on every tab click (auth check + DB query before render).
+- **Fix**: All dashboard pages converted to `"use client"`. Data fetched in `useEffect` after instant shell render.
+- **ProfileProvider**: React context at layout level — fetches profile once, shared to all pages and DashboardNav. No per-page profile re-fetch.
+- **Skeleton loaders**: Every page shows skeleton while data loads, so no blank flash.
+- **Layout is still server**: `(dashboard)/layout.tsx` remains a server component for the initial session cookie check (fast — no DB query). Only the children are client components.
+
 ### [2026-05-26] Logging System
 - **Gate**: `ENABLE_DEBUG_LOGS=true` enables logs. Default `false` (silent in production).
 - **File**: `lib/logger.ts` — levels: info, warn, error, debug
@@ -85,8 +110,8 @@ Update after every major change so future debugging sessions have full context.
 | Variable | Required | Description |
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Anon key (browser-safe) |
-| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Service role key (server only, bypasses RLS) |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Yes | Publishable key `sb_publishable_...` (replaces legacy anon key — browser-safe) |
+| `SUPABASE_SECRET_KEY` | Yes | Secret key `sb_secret_...` (replaces legacy service_role key — server only, bypasses RLS) |
 | `RESEND_API_KEY` | Yes | Resend email API key |
 | `BACKUP_EMAIL` | Yes | Backup Excel delivery address |
 | `CRON_SECRET` | Yes | Cron endpoint security token |
@@ -99,3 +124,4 @@ Update after every major change so future debugging sessions have full context.
 - **`proxy.ts` instead of `middleware.ts`**: Next.js 16 deprecated the middleware convention. File is `proxy.ts` and must export `proxy` function (not `middleware`).
 - **Base UI in shadcn**: `@base-ui/react` replaces Radix UI. No `asChild` prop on Button. Use `Link` with `buttonVariants()` for link-style buttons. Use `render={<Component />}` on primitive triggers.
 - **Resend lazy init required**: Must not instantiate `new Resend(key)` at module level — crashes build when env var absent. Use lazy getter pattern.
+- **New Supabase key format (2026)**: Use `sb_publishable_...` (env: `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`) instead of legacy anon key. Use `sb_secret_...` (env: `SUPABASE_SECRET_KEY`) instead of legacy service_role key. Legacy keys retire late 2026. Same `createClient()` API — drop-in replacement.
