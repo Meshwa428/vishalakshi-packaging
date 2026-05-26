@@ -103,7 +103,7 @@ export function StockReport({ rows, loading, generated, dateRange, isAdmin }: St
         </div>
         <Button variant="outline" onClick={handleExport} className="gap-2 shrink-0">
           <Download className="h-4 w-4" />
-          Export Excel
+          Download Excel
         </Button>
       </div>
 

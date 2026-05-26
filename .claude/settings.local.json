@@ -10,7 +10,8 @@
       "mcp__dbefb8b2-4aa4-4267-8a27-e663b2174b39__list_projects",
       "mcp__dbefb8b2-4aa4-4267-8a27-e663b2174b39__get_project_url",
       "mcp__dbefb8b2-4aa4-4267-8a27-e663b2174b39__get_publishable_keys",
-      "mcp__dbefb8b2-4aa4-4267-8a27-e663b2174b39__execute_sql"
+      "mcp__dbefb8b2-4aa4-4267-8a27-e663b2174b39__execute_sql",
+      "mcp__dbefb8b2-4aa4-4267-8a27-e663b2174b39__apply_migration"
     ]
   }
 }

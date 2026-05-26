@@ -84,6 +84,25 @@ Update after every major change so future debugging sessions have full context.
 - **File**: `lib/logger.ts` — levels: info, warn, error, debug
 - **Coverage**: Auth, page loads, form submit, DB errors, cron, email sends
 
+### [2026-05-26] Invoice Number Global Uniqueness
+- **Problem**: `invoice_number` had a UNIQUE constraint per table, but the same number could exist in both `stock_entries` and `stock_out_entries`.
+- **DB fix**: Trigger function `check_invoice_number_global_unique()` on `BEFORE INSERT OR UPDATE` of both tables — checks the OTHER table for the same invoice number. Skips check on UPDATE when the invoice number hasn't changed (no false positives on edits).
+- **App fix**: Both `EntryForm` and `StockOutForm` do a cross-table query before submitting. Error shown immediately without touching the DB. Also skips the check on edit when invoice hasn't changed.
+- **Triggers**: `trg_invoice_unique_stock_entries` on `stock_entries`; `trg_invoice_unique_stock_out_entries` on `stock_out_entries`.
+
+### [2026-05-26] Pre-Check Pattern for Data Integrity (no orphaned rows)
+- **Problem**: Header row inserted first, then items insert fails (e.g. duplicate `reel_no`). Rollback delete was unreliable — RLS blocks operators from DELETE, causing orphaned header rows with 0 items.
+- **Fix**: Validate everything that could fail BEFORE any DB write:
+  1. Cross-table invoice uniqueness check (see above)
+  2. `EntryForm`: queries `stock_entry_items` for all reel numbers in the form before inserting. If any exist in another entry, abort with a clear toast.
+  3. Edit mode: only checks reel numbers that are NEW to the entry (not already on the entry being edited) — avoids false positives when re-saving unchanged reels.
+- **Rule**: Never insert the header row until all pre-conditions are confirmed clean. The items insert should never fail after the header is in.
+
+### [2026-05-26] New Entry Page — Form State Preservation & Reset
+- **Problem**: Switching between Stock In / Stock Out tabs unmounted the inactive form, wiping filled data.
+- **Fix**: Both `<EntryForm>` and `<StockOutForm>` are always mounted in `new/page.tsx`. The inactive form gets `className="hidden"` (CSS only — no unmount). React Hook Form state is preserved across tab switches.
+- **Reset button**: Sits top-right of the toggle row. Increments `stockInResetKey` or `stockOutResetKey` (separate per tab). Each form accepts a `resetSignal?: number` prop and watches it in a `useEffect` — calls `methods.reset()` to blank values when the signal increments. The two reset keys are independent.
+
 ---
 
 ## Key File Map
@@ -99,9 +118,13 @@ Update after every major change so future debugging sessions have full context.
 | `supabase/schema.sql` | Full DB schema with RLS + seed data |
 | `vercel.json` | Cron schedules |
 | `.env.local.example` | All required env vars |
-| `components/stock-entry/EntryForm.tsx` | Core create/edit form |
+| `components/stock-entry/EntryForm.tsx` | Stock In create/edit form (pre-checks invoice + reel uniqueness) |
+| `components/stock-entry/StockOutForm.tsx` | Stock Out create/edit form (pre-checks invoice uniqueness) |
+| `components/stock-entry/StockOutItemRow.tsx` | Stock Out item row (GSM → Reel dropdown + auto-fill) |
 | `components/settings/EnumManager.tsx` | Admin dropdown option manager |
-| `components/reports/ReportTable.tsx` | Monthly reel-wise report + export |
+| `components/reports/StockReport.tsx` | Reel-wise stock report table + Excel download |
+| `components/reports/DateRangeSelector.tsx` | From/To date inputs + Generate button |
+| `components/shared/ProfileProvider.tsx` | React context — fetches profile once, shared app-wide |
 
 ---
 

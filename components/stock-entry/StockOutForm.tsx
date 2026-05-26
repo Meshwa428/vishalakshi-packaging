@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useForm, FormProvider, useFieldArray, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -44,6 +44,7 @@ interface StockOutFormProps {
   settings: AppSettings
   existingEntry?: StockOutEntry & { stock_out_items: StockOutItem[] }
   isEdit?: boolean
+  resetSignal?: number
 }
 
 const emptyItem = (): FormData["items"][0] => ({
@@ -69,7 +70,7 @@ function TotalsRow({ control }: { control: ReturnType<typeof useForm<FormData>>[
   )
 }
 
-export function StockOutForm({ settings, existingEntry, isEdit }: StockOutFormProps) {
+export function StockOutForm({ settings, existingEntry, isEdit, resetSignal }: StockOutFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState<"draft" | "done" | null>(null)
 
@@ -105,6 +106,20 @@ export function StockOutForm({ settings, existingEntry, isEdit }: StockOutFormPr
   const { register, control, handleSubmit, formState: { errors } } = methods
   const { fields, append, remove } = useFieldArray({ control, name: "items" })
 
+  // Reset form when resetSignal increments (triggered by Reset button in parent)
+  useEffect(() => {
+    if (!resetSignal) return
+    methods.reset({
+      invoice_number: "",
+      date: new Date().toISOString().split("T")[0],
+      truck_number: "",
+      party_name: "",
+      shipped_from: "",
+      delivery_address: "",
+      items: [emptyItem()],
+    })
+  }, [resetSignal]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const onSubmit = async (data: FormData, status: EntryStatus) => {
     setLoading(status)
     logger.info("Submitting stock out entry", { invoiceNo: data.invoice_number, status })
@@ -112,6 +127,21 @@ export function StockOutForm({ settings, existingEntry, isEdit }: StockOutFormPr
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { toast.error("Session expired. Please sign in again."); return }
+
+      // Cross-table invoice uniqueness check
+      // Skip if editing and the invoice number hasn't changed
+      const invoiceChanged = !isEdit || (existingEntry && existingEntry.invoice_number !== data.invoice_number)
+      if (invoiceChanged) {
+        const { count: inCount } = await supabase
+          .from("stock_entries")
+          .select("id", { count: "exact", head: true })
+          .eq("invoice_number", data.invoice_number)
+        if ((inCount ?? 0) > 0) {
+          toast.error(`Invoice number "${data.invoice_number}" already exists in a Stock In entry.`)
+          setLoading(null)
+          return
+        }
+      }
 
       if (isEdit && existingEntry) {
         const { error: headerError } = await supabase
