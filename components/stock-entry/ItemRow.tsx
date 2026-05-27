@@ -14,9 +14,10 @@ interface ItemRowProps {
   onRemove: () => void
   canRemove: boolean
   isReadOnly?: boolean
+  onEnterKey?: () => void
 }
 
-export function ItemRow({ index, settings, onRemove, canRemove, isReadOnly }: ItemRowProps) {
+export function ItemRow({ index, settings, onRemove, canRemove, isReadOnly, onEnterKey }: ItemRowProps) {
   const { register, setValue, control, formState: { errors } } = useFormContext()
 
   // All watches at top level — Rules of Hooks compliant
@@ -126,6 +127,9 @@ export function ItemRow({ index, settings, onRemove, canRemove, isReadOnly }: It
             step="0.01"
             placeholder="kg"
             className="h-9 text-sm"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { e.preventDefault(); onEnterKey?.() }
+            }}
           />
         )}
       </td>

@@ -67,79 +67,128 @@ export function DashboardNav() {
   )
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex h-14 items-center justify-between">
-          {/* Logo */}
-          <div className="flex items-center gap-6">
-            <Link href="/stock-entries" className="flex items-center gap-2">
-              <Package className="h-5 w-5 text-foreground" />
-              <span className="font-semibold text-sm hidden sm:block">Vishalakshi Packaging</span>
-            </Link>
-            {/* Desktop Nav */}
-            <nav className="hidden md:flex items-center gap-1">
-              {loading ? (
-                <div className="flex items-center gap-1">
-                  <Skeleton className="h-8 w-24 rounded-md" />
-                  <Skeleton className="h-8 w-20 rounded-md" />
-                </div>
-              ) : (
-                <NavLinks />
-              )}
-            </nav>
-          </div>
-
-          {/* Right side */}
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <div className="hidden sm:flex items-center gap-3">
-              {loading ? (
-                <Skeleton className="h-4 w-24 rounded" />
-              ) : (
-                <span className="text-sm text-muted-foreground">{profile?.full_name}</span>
-              )}
-              <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-1.5 cursor-pointer">
-                <LogOut className="h-4 w-4" />
-                Sign out
-              </Button>
+    <>
+      {/* Top header */}
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex h-14 items-center justify-between">
+            {/* Logo */}
+            <div className="flex items-center gap-6">
+              <Link href="/stock-entries" className="flex items-center gap-2">
+                <Package className="h-5 w-5 text-foreground" />
+                <span className="font-semibold text-sm">Vishalakshi Packaging</span>
+              </Link>
+              {/* Desktop Nav */}
+              <nav className="hidden md:flex items-center gap-1">
+                {loading ? (
+                  <div className="flex items-center gap-1">
+                    <Skeleton className="h-8 w-24 rounded-md" />
+                    <Skeleton className="h-8 w-20 rounded-md" />
+                  </div>
+                ) : (
+                  <NavLinks />
+                )}
+              </nav>
             </div>
 
-            {/* Mobile hamburger */}
-            <Sheet>
-              <SheetTrigger
-                render={<Button variant="ghost" size="icon" className="md:hidden" />}
-              >
-                <Menu className="h-5 w-5" />
-              </SheetTrigger>
-              <SheetContent side="right" className="w-64">
-                <div className="flex flex-col gap-4 mt-6">
-                  <nav className="flex flex-col gap-1">
-                    {loading ? (
-                      <div className="space-y-1">
-                        <Skeleton className="h-9 w-full rounded-md" />
-                        <Skeleton className="h-9 w-full rounded-md" />
-                      </div>
-                    ) : (
-                      <NavLinks />
-                    )}
-                  </nav>
-                  <div className="pt-4 border-t">
-                    {loading ? (
-                      <Skeleton className="h-4 w-28 mb-3 rounded" />
-                    ) : (
-                      <p className="text-sm text-muted-foreground mb-3">{profile?.full_name}</p>
-                    )}
-                    <Button variant="outline" size="sm" onClick={handleLogout} className="w-full gap-1.5">
-                      <LogOut className="h-4 w-4" />
-                      Sign out
-                    </Button>
+            {/* Right side */}
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <div className="hidden sm:flex items-center gap-3">
+                {loading ? (
+                  <Skeleton className="h-4 w-24 rounded" />
+                ) : (
+                  <span className="text-sm text-muted-foreground">{profile?.full_name}</span>
+                )}
+                <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-1.5 cursor-pointer">
+                  <LogOut className="h-4 w-4" />
+                  Sign out
+                </Button>
+              </div>
+
+              {/* Mobile hamburger — nav + user info + sign out */}
+              <Sheet>
+                <SheetTrigger
+                  render={<Button variant="ghost" size="icon" className="md:hidden" />}
+                >
+                  <Menu className="h-5 w-5" />
+                </SheetTrigger>
+                <SheetContent side="right" className="w-64 p-4 pt-12">
+                  {/* User info */}
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center shrink-0">
+                      <span className="text-sm font-semibold text-muted-foreground">
+                        {profile?.full_name?.[0]?.toUpperCase() ?? "?"}
+                      </span>
+                    </div>
+                    <div className="min-w-0">
+                      {loading ? (
+                        <>
+                          <Skeleton className="h-3.5 w-24 mb-1 rounded" />
+                          <Skeleton className="h-3 w-16 rounded" />
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-sm font-medium leading-tight truncate">{profile?.full_name}</p>
+                          <p className="text-xs text-muted-foreground capitalize">{profile?.role}</p>
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </SheetContent>
-            </Sheet>
+                  <Button variant="outline" size="sm" onClick={handleLogout} className="w-full gap-1.5">
+                    <LogOut className="h-4 w-4" />
+                    Sign out
+                  </Button>
+                </SheetContent>
+              </Sheet>
+            </div>
           </div>
         </div>
-      </div>
-    </header>
+      </header>
+
+      {/* Mobile bottom tab bar */}
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-50 md:hidden border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        <div className="flex items-stretch h-16">
+          {loading ? (
+            <div className="flex items-center justify-around w-full px-4">
+              {[1, 2].map((i) => (
+                <div key={i} className="flex flex-col items-center gap-1.5">
+                  <Skeleton className="h-5 w-5 rounded" />
+                  <Skeleton className="h-3 w-12 rounded" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            allItems.map((item) => {
+              const active = pathname.startsWith(item.href)
+              const Icon = item.icon
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex flex-col items-center justify-center gap-1 flex-1 min-h-[44px] transition-colors relative",
+                    active ? "text-foreground" : "text-muted-foreground"
+                  )}
+                >
+                  {active && (
+                    <motion.div
+                      layoutId="mobile-nav-indicator"
+                      className="absolute inset-x-2 inset-y-1.5 bg-accent rounded-lg -z-10"
+                      transition={{ type: "spring", bounce: 0.2, duration: 0.35 }}
+                    />
+                  )}
+                  <Icon className="h-5 w-5" />
+                  <span className="text-[10px] font-medium">{item.label}</span>
+                </Link>
+              )
+            })
+          )}
+        </div>
+      </nav>
+    </>
   )
 }

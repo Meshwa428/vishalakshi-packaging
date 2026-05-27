@@ -109,10 +109,11 @@ export function StockReport({ rows, loading, generated, dateRange, isAdmin }: St
 
       <div className="rounded-lg border overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[860px] text-sm">
             <thead>
               <tr className="bg-muted/50 border-b">
-                {["Reel No", "Date", "Invoice No", "Party Name", "GSM", "BF", "Type", "Quality"].map((h) => (
+                <th className="text-left text-xs font-medium text-muted-foreground py-3 px-4 whitespace-nowrap sticky left-0 bg-muted/50 z-10">Reel No</th>
+                {["Date", "Invoice No", "Party Name", "GSM", "BF", "Type", "Quality"].map((h) => (
                   <th key={h} className="text-left text-xs font-medium text-muted-foreground py-3 px-4 whitespace-nowrap">{h}</th>
                 ))}
                 <th className="text-right text-xs font-medium text-emerald-600 py-3 px-4 whitespace-nowrap">Stock In</th>
@@ -129,7 +130,7 @@ export function StockReport({ rows, loading, generated, dateRange, isAdmin }: St
                   transition={{ delay: i * 0.02, duration: 0.2 }}
                   className="border-b last:border-0 hover:bg-muted/30 transition-colors"
                 >
-                  <td className="py-3 px-4 font-mono font-medium">{row.reel_no}</td>
+                  <td className="py-3 px-4 font-mono font-medium sticky left-0 bg-background z-10 after:absolute after:right-0 after:top-0 after:bottom-0 after:w-px after:bg-border">{row.reel_no}</td>
                   <td className="py-3 px-4 text-muted-foreground whitespace-nowrap">{formatDate(row.date)}</td>
                   <td className="py-3 px-4">
                     {isAdmin ? (
@@ -163,7 +164,7 @@ export function StockReport({ rows, loading, generated, dateRange, isAdmin }: St
             </tbody>
             <tfoot>
               <tr className="border-t bg-muted/40">
-                <td className="py-3 px-4 text-xs font-medium text-muted-foreground" colSpan={8}>
+                <td className="py-3 px-4 text-xs font-medium text-muted-foreground sticky left-0 bg-muted/40 z-10" colSpan={8}>
                   Totals — {filtered.length} reel{filtered.length !== 1 ? "s" : ""}
                 </td>
                 <td className="py-3 px-4 text-right text-xs font-semibold text-emerald-600 whitespace-nowrap">

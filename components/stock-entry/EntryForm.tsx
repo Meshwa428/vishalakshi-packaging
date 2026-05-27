@@ -122,6 +122,11 @@ export function EntryForm({ settings, existingEntry, isEdit, resetSignal }: Entr
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { toast.error("Session expired. Please sign in again."); return }
 
+      // For drafts, filter out incomplete reel rows (empty reel_no) — allows partial saves
+      const effectiveItems = status === "draft"
+        ? (data.items ?? []).filter(item => item.reel_no?.trim())
+        : data.items
+
       // Cross-table invoice uniqueness check
       // Skip if editing and the invoice number hasn't changed
       const invoiceChanged = !isEdit || (existingEntry && existingEntry.invoice_number !== data.invoice_number)
@@ -139,7 +144,7 @@ export function EntryForm({ settings, existingEntry, isEdit, resetSignal }: Entr
 
       // Pre-check reel_no uniqueness before any DB write
       // For edit: only check reel_nos that are NEW (not in the original entry)
-      const submittedReelNos = data.items.map((i) => i.reel_no).filter(Boolean)
+      const submittedReelNos = effectiveItems.map((i) => i.reel_no).filter(Boolean)
       const originalReelNos = new Set(existingEntry?.stock_entry_items?.map((i) => i.reel_no) ?? [])
       const reelNosToCheck = isEdit
         ? submittedReelNos.filter((r) => !originalReelNos.has(r))
@@ -181,9 +186,11 @@ export function EntryForm({ settings, existingEntry, isEdit, resetSignal }: Entr
 
         // Delete old items and re-insert
         await supabase.from("stock_entry_items").delete().eq("stock_entry_id", existingEntry.id)
-        const { error: itemsError } = await supabase.from("stock_entry_items").insert(
-          data.items.map((item) => ({ ...item, stock_entry_id: existingEntry.id, weight: item.weight ?? null }))
-        )
+        const { error: itemsError } = effectiveItems.length > 0
+          ? await supabase.from("stock_entry_items").insert(
+              effectiveItems.map((item) => ({ ...item, stock_entry_id: existingEntry.id, weight: item.weight ?? null }))
+            )
+          : { error: null }
 
         if (itemsError) {
           logger.error("Failed to update stock entry items", itemsError)
@@ -221,9 +228,11 @@ export function EntryForm({ settings, existingEntry, isEdit, resetSignal }: Entr
           return
         }
 
-        const { error: itemsError } = await supabase.from("stock_entry_items").insert(
-          data.items.map((item) => ({ ...item, stock_entry_id: entry.id, weight: item.weight ?? null }))
-        )
+        const { error: itemsError } = effectiveItems.length > 0
+          ? await supabase.from("stock_entry_items").insert(
+              effectiveItems.map((item) => ({ ...item, stock_entry_id: entry.id, weight: item.weight ?? null }))
+            )
+          : { error: null }
 
         if (itemsError) {
           logger.error("Failed to insert stock entry items", itemsError)
@@ -307,8 +316,9 @@ export function EntryForm({ settings, existingEntry, isEdit, resetSignal }: Entr
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <div className="relative">
+              <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px] text-sm">
                 <thead>
                   <tr className="border-b bg-muted/50">
                     <th className="text-left text-xs font-medium text-muted-foreground py-2.5 px-2">Reel No *</th>
@@ -330,12 +340,16 @@ export function EntryForm({ settings, existingEntry, isEdit, resetSignal }: Entr
                         settings={settings}
                         onRemove={() => remove(index)}
                         canRemove={fields.length > 1}
+                        onEnterKey={() => append(emptyItem())}
                       />
                     ))}
                   </AnimatePresence>
                   <TotalsRow control={control} />
                 </tbody>
               </table>
+              </div>
+              {/* Scroll hint gradient — mobile only */}
+              <div className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-background to-transparent pointer-events-none sm:hidden rounded-r-lg" />
             </div>
             {errors.items && typeof errors.items === "object" && "message" in errors.items && (
               <p className="text-xs text-destructive px-4 py-2">{String(errors.items.message)}</p>
@@ -356,12 +370,19 @@ export function EntryForm({ settings, existingEntry, isEdit, resetSignal }: Entr
             Cancel
           </Button>
 
-          {/* Save as Draft — always available unless editing a done entry */}
+          {/* Save as Draft — bypasses RHF validation so partial entries can be saved */}
           {(!isEdit || isDraftEntry) && (
             <Button
               type="button"
               variant="outline"
-              onClick={() => handleSubmit((data) => onSubmit(data, "draft"))()}
+              onClick={() => {
+                const values = methods.getValues()
+                if (!values.invoice_number?.trim()) {
+                  toast.error("Invoice number is required to save as draft.")
+                  return
+                }
+                onSubmit(values, "draft")
+              }}
               disabled={loading !== null}
               className="gap-2 cursor-pointer"
             >

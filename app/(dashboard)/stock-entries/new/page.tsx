@@ -38,7 +38,7 @@ export default function NewStockEntryPage() {
       />
 
       {/* Toggle + Reset row */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2 p-1 rounded-lg bg-muted w-fit">
           <button
             type="button"

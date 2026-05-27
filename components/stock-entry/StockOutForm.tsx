@@ -128,6 +128,11 @@ export function StockOutForm({ settings, existingEntry, isEdit, resetSignal }: S
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { toast.error("Session expired. Please sign in again."); return }
 
+      // For drafts, filter out incomplete reel rows
+      const effectiveItems = status === "draft"
+        ? (data.items ?? []).filter(item => item.reel_no?.trim())
+        : data.items
+
       // Cross-table invoice uniqueness check
       // Skip if editing and the invoice number hasn't changed
       const invoiceChanged = !isEdit || (existingEntry && existingEntry.invoice_number !== data.invoice_number)
@@ -165,9 +170,11 @@ export function StockOutForm({ settings, existingEntry, isEdit, resetSignal }: S
         }
 
         await supabase.from("stock_out_items").delete().eq("stock_out_entry_id", existingEntry.id)
-        const { error: itemsError } = await supabase.from("stock_out_items").insert(
-          data.items.map((item) => ({ ...item, stock_out_entry_id: existingEntry.id, weight: item.weight ?? null }))
-        )
+        const { error: itemsError } = effectiveItems.length > 0
+          ? await supabase.from("stock_out_items").insert(
+              effectiveItems.map((item) => ({ ...item, stock_out_entry_id: existingEntry.id, weight: item.weight ?? null }))
+            )
+          : { error: null }
         if (itemsError) {
           logger.error("Failed to update stock out items", itemsError)
           toast.error("Entry saved but reel details failed. Please edit again.")
@@ -202,9 +209,11 @@ export function StockOutForm({ settings, existingEntry, isEdit, resetSignal }: S
           return
         }
 
-        const { error: itemsError } = await supabase.from("stock_out_items").insert(
-          data.items.map((item) => ({ ...item, stock_out_entry_id: entry.id, weight: item.weight ?? null }))
-        )
+        const { error: itemsError } = effectiveItems.length > 0
+          ? await supabase.from("stock_out_items").insert(
+              effectiveItems.map((item) => ({ ...item, stock_out_entry_id: entry.id, weight: item.weight ?? null }))
+            )
+          : { error: null }
         if (itemsError) {
           await supabase.from("stock_out_entries").delete().eq("id", entry.id)
           toast.error("Failed to save reel details. Please try again.")
@@ -271,8 +280,9 @@ export function StockOutForm({ settings, existingEntry, isEdit, resetSignal }: S
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <div className="relative">
+              <div className="overflow-x-auto">
+              <table className="w-full min-w-[700px] text-sm">
                 <thead>
                   <tr className="border-b bg-muted/50">
                     <th className="text-left text-xs font-medium text-muted-foreground py-2.5 px-3 w-10">#</th>
@@ -295,12 +305,16 @@ export function StockOutForm({ settings, existingEntry, isEdit, resetSignal }: S
                         settings={settings}
                         onRemove={() => remove(index)}
                         canRemove={fields.length > 1}
+                        onEnterKey={() => append(emptyItem())}
                       />
                     ))}
                   </AnimatePresence>
                   <TotalsRow control={control} />
                 </tbody>
               </table>
+              </div>
+              {/* Scroll hint gradient — mobile only */}
+              <div className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-background to-transparent pointer-events-none sm:hidden rounded-r-lg" />
             </div>
             {errors.items && typeof errors.items === "object" && "message" in errors.items && (
               <p className="text-xs text-destructive px-4 py-2">{String(errors.items.message)}</p>
@@ -315,7 +329,14 @@ export function StockOutForm({ settings, existingEntry, isEdit, resetSignal }: S
             Cancel
           </Button>
           {(!isEdit || isDraftEntry) && (
-            <Button type="button" variant="outline" onClick={() => handleSubmit((data) => onSubmit(data, "draft"))()} disabled={loading !== null} className="gap-2 cursor-pointer">
+            <Button type="button" variant="outline" onClick={() => {
+              const values = methods.getValues()
+              if (!values.invoice_number?.trim()) {
+                toast.error("Invoice number is required to save as draft.")
+                return
+              }
+              onSubmit(values, "draft")
+            }} disabled={loading !== null} className="gap-2 cursor-pointer">
               {loading === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
               Save as Draft
             </Button>
