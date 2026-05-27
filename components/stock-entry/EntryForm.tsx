@@ -64,6 +64,18 @@ function TotalsRow({ control }: { control: ReturnType<typeof useForm<FormData>>[
   )
 }
 
+function MobileTotals({ control }: { control: ReturnType<typeof useForm<FormData>>["control"] }) {
+  const items = useWatch({ control, name: "items" }) ?? []
+  const totalWeight = items.reduce((sum, item) => sum + (Number(item?.weight) || 0), 0)
+  return (
+    <span className="text-sm font-semibold tabular-nums">
+      {items.length} reel{items.length !== 1 ? "s" : ""}
+      <span className="text-muted-foreground font-normal mx-1.5">·</span>
+      {totalWeight.toFixed(2)} kg
+    </span>
+  )
+}
+
 export function EntryForm({ settings, existingEntry, isEdit, resetSignal }: EntryFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState<"draft" | "done" | null>(null)
@@ -308,7 +320,7 @@ export function EntryForm({ settings, existingEntry, isEdit, resetSignal }: Entr
                 variant="outline"
                 size="sm"
                 onClick={() => append(emptyItem())}
-                className="gap-1.5"
+                className="gap-1.5 h-9"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Add Reel
@@ -316,7 +328,41 @@ export function EntryForm({ settings, existingEntry, isEdit, resetSignal }: Entr
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="relative">
+            {/* ── Mobile card list (sm and below) ── */}
+            <div className="sm:hidden p-3 space-y-3">
+              <AnimatePresence initial={false}>
+                {fields.map((field, index) => (
+                  <ItemRow
+                    key={field.id}
+                    mobile
+                    index={index}
+                    settings={settings}
+                    onRemove={() => remove(index)}
+                    canRemove={fields.length > 1}
+                    onEnterKey={() => append(emptyItem())}
+                  />
+                ))}
+              </AnimatePresence>
+
+              {/* Inline "Add Reel" — below last card, easy thumb reach */}
+              <button
+                type="button"
+                onClick={() => append(emptyItem())}
+                className="w-full h-12 rounded-xl border-2 border-dashed border-border hover:border-foreground/30 hover:bg-muted/40 transition-colors flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground active:scale-[0.98]"
+              >
+                <Plus className="h-4 w-4" />
+                Add Another Reel
+              </button>
+
+              {/* Mobile totals bar */}
+              <div className="flex items-center justify-between px-1 py-2 border-t">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Total</span>
+                <MobileTotals control={control} />
+              </div>
+            </div>
+
+            {/* ── Desktop table (sm+) ── */}
+            <div className="hidden sm:block relative">
               <div className="overflow-x-auto">
               <table className="w-full min-w-[640px] text-sm">
                 <thead>
@@ -348,9 +394,8 @@ export function EntryForm({ settings, existingEntry, isEdit, resetSignal }: Entr
                 </tbody>
               </table>
               </div>
-              {/* Scroll hint gradient — mobile only */}
-              <div className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-background to-transparent pointer-events-none sm:hidden rounded-r-lg" />
             </div>
+
             {errors.items && typeof errors.items === "object" && "message" in errors.items && (
               <p className="text-xs text-destructive px-4 py-2">{String(errors.items.message)}</p>
             )}
@@ -359,12 +404,12 @@ export function EntryForm({ settings, existingEntry, isEdit, resetSignal }: Entr
 
         <Separator />
 
-        <div className="flex flex-col-reverse sm:flex-row justify-end gap-3">
+        <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3">
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             onClick={() => router.back()}
-            className="cursor-pointer"
+            className="cursor-pointer text-muted-foreground h-11 sm:h-9"
             disabled={loading !== null}
           >
             Cancel
@@ -384,7 +429,7 @@ export function EntryForm({ settings, existingEntry, isEdit, resetSignal }: Entr
                 onSubmit(values, "draft")
               }}
               disabled={loading !== null}
-              className="gap-2 cursor-pointer"
+              className="gap-2 cursor-pointer h-11 sm:h-9"
             >
               {loading === "draft" ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -400,7 +445,7 @@ export function EntryForm({ settings, existingEntry, isEdit, resetSignal }: Entr
             type="button"
             onClick={() => handleSubmit((data) => onSubmit(data, "done"))()}
             disabled={loading !== null}
-            className="gap-2 cursor-pointer"
+            className="gap-2 cursor-pointer h-11 sm:h-9 text-base sm:text-sm font-semibold sm:font-medium"
           >
             {loading === "done" ? (
               <Loader2 className="h-4 w-4 animate-spin" />

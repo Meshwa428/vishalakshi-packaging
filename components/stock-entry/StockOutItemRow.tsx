@@ -16,6 +16,7 @@ interface StockOutItemRowProps {
   onRemove: () => void
   canRemove: boolean
   onEnterKey: () => void
+  mobile?: boolean
 }
 
 interface ReelOption {
@@ -27,13 +28,18 @@ interface ReelOption {
   weight: number | null
 }
 
-export function StockOutItemRow({ index, settings, onRemove, canRemove, onEnterKey }: StockOutItemRowProps) {
+export function StockOutItemRow({ index, settings, onRemove, canRemove, onEnterKey, mobile }: StockOutItemRowProps) {
   const { register, setValue, control } = useFormContext()
   const [reelOptions, setReelOptions] = useState<ReelOption[]>([])
   const [loadingReels, setLoadingReels] = useState(false)
 
   const gsmVal = useWatch({ control, name: `items.${index}.gsm` })
   const reelVal = useWatch({ control, name: `items.${index}.reel_no` })
+  const sizeVal = useWatch({ control, name: `items.${index}.size` })
+  const typeVal = useWatch({ control, name: `items.${index}.type` })
+  const bfVal = useWatch({ control, name: `items.${index}.bf` })
+  const qualityVal = useWatch({ control, name: `items.${index}.quality` })
+  const weightVal = useWatch({ control, name: `items.${index}.weight` })
 
   // Fetch available reels when GSM changes
   useEffect(() => {
@@ -77,6 +83,125 @@ export function StockOutItemRow({ index, settings, onRemove, canRemove, onEnterK
     }
   }
 
+  // ── Mobile card layout ──────────────────────────────────────────
+  if (mobile) {
+    const num = String(index + 1).padStart(2, "0")
+    return (
+      <motion.div
+        layout
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -6, scale: 0.98 }}
+        transition={{ duration: 0.18, ease: "easeOut" }}
+        className="rounded-xl border bg-card overflow-hidden"
+      >
+        {/* Card header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
+          <div className="flex items-center gap-2.5">
+            <span className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-foreground text-background text-[11px] font-bold tabular-nums shrink-0">
+              {num}
+            </span>
+            <span className="text-sm font-semibold tracking-tight">Reel #{index + 1}</span>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={onRemove}
+            disabled={!canRemove}
+            className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 disabled:opacity-30"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          {/* GSM — full width first, most important selector */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
+              GSM <span className="text-destructive">*</span>
+            </label>
+            <Select value={gsmVal || ""} onValueChange={(v) => setValue(`items.${index}.gsm`, v)}>
+              <SelectTrigger className="h-11 text-sm">
+                <SelectValue placeholder="Select GSM" />
+              </SelectTrigger>
+              <SelectContent>
+                {settings.gsm_options.map((opt) => (
+                  <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <input type="hidden" {...register(`items.${index}.gsm`)} />
+          </div>
+
+          {/* Reel No — enabled only after GSM selected */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
+              Reel No <span className="text-destructive">*</span>
+            </label>
+            <Select
+              value={reelVal || ""}
+              onValueChange={handleReelSelect}
+              disabled={!gsmVal || loadingReels}
+            >
+              <SelectTrigger className="h-11 text-sm">
+                <SelectValue placeholder={
+                  !gsmVal ? "Select GSM first" :
+                  loadingReels ? "Loading reels…" :
+                  reelOptions.length === 0 ? "No reels available" : "Select reel"
+                } />
+              </SelectTrigger>
+              <SelectContent>
+                {reelOptions.map((r) => (
+                  <SelectItem key={r.reel_no} value={r.reel_no}>{r.reel_no}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <input type="hidden" {...register(`items.${index}.reel_no`)} />
+          </div>
+
+          {/* Auto-filled details — shown as a filled summary card once reel is chosen */}
+          {reelVal ? (
+            <div className="rounded-lg bg-muted/50 border divide-y text-sm">
+              <div className="grid grid-cols-2 divide-x">
+                {[["Size", sizeVal], ["Type", typeVal]].map(([label, val]) => (
+                  <div key={label as string} className="px-3 py-2.5">
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-0.5">{label}</p>
+                    <p className="font-medium">{(val as string) || "—"}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 divide-x">
+                {[["BF", bfVal], ["Quality", qualityVal]].map(([label, val]) => (
+                  <div key={label as string} className="px-3 py-2.5">
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-0.5">{label}</p>
+                    <p className="font-medium">{(val as string) || "—"}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="px-3 py-2.5 flex items-center justify-between">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Weight</p>
+                <p className="font-semibold font-mono tabular-nums">{weightVal != null ? `${weightVal} kg` : "—"}</p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground italic text-center py-1">
+              Select GSM & Reel No to auto-fill details
+            </p>
+          )}
+        </div>
+
+        {/* Hidden inputs for form values */}
+        <input type="hidden" {...register(`items.${index}.size`)} />
+        <input type="hidden" {...register(`items.${index}.type`)} />
+        <input type="hidden" {...register(`items.${index}.bf`)} />
+        <input type="hidden" {...register(`items.${index}.quality`)} />
+        <input type="hidden" {...register(`items.${index}.weight`, { valueAsNumber: true })} />
+      </motion.div>
+    )
+  }
+
+  // ── Desktop table row ────────────────────────────────────────────
   return (
     <motion.tr
       layout

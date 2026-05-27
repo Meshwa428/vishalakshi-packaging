@@ -70,6 +70,18 @@ function TotalsRow({ control }: { control: ReturnType<typeof useForm<FormData>>[
   )
 }
 
+function MobileTotals({ control }: { control: ReturnType<typeof useForm<FormData>>["control"] }) {
+  const items = useWatch({ control, name: "items" }) ?? []
+  const totalWeight = items.reduce((sum, item) => sum + (Number(item?.weight) || 0), 0)
+  return (
+    <span className="text-sm font-semibold tabular-nums">
+      {items.length} reel{items.length !== 1 ? "s" : ""}
+      <span className="text-muted-foreground font-normal mx-1.5">·</span>
+      {totalWeight.toFixed(2)} kg
+    </span>
+  )
+}
+
 export function StockOutForm({ settings, existingEntry, isEdit, resetSignal }: StockOutFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState<"draft" | "done" | null>(null)
@@ -280,7 +292,41 @@ export function StockOutForm({ settings, existingEntry, isEdit, resetSignal }: S
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="relative">
+            {/* ── Mobile card list (sm and below) ── */}
+            <div className="sm:hidden p-3 space-y-3">
+              <AnimatePresence initial={false}>
+                {fields.map((field, index) => (
+                  <StockOutItemRow
+                    key={field.id}
+                    mobile
+                    index={index}
+                    settings={settings}
+                    onRemove={() => remove(index)}
+                    canRemove={fields.length > 1}
+                    onEnterKey={() => append(emptyItem())}
+                  />
+                ))}
+              </AnimatePresence>
+
+              {/* Inline "Add Reel" — below last card */}
+              <button
+                type="button"
+                onClick={() => append(emptyItem())}
+                className="w-full h-12 rounded-xl border-2 border-dashed border-border hover:border-foreground/30 hover:bg-muted/40 transition-colors flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground active:scale-[0.98]"
+              >
+                <Plus className="h-4 w-4" />
+                Add Another Reel
+              </button>
+
+              {/* Mobile totals bar */}
+              <div className="flex items-center justify-between px-1 py-2 border-t">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Total</span>
+                <MobileTotals control={control} />
+              </div>
+            </div>
+
+            {/* ── Desktop table (sm+) ── */}
+            <div className="hidden sm:block relative">
               <div className="overflow-x-auto">
               <table className="w-full min-w-[700px] text-sm">
                 <thead>
@@ -313,9 +359,8 @@ export function StockOutForm({ settings, existingEntry, isEdit, resetSignal }: S
                 </tbody>
               </table>
               </div>
-              {/* Scroll hint gradient — mobile only */}
-              <div className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-background to-transparent pointer-events-none sm:hidden rounded-r-lg" />
             </div>
+
             {errors.items && typeof errors.items === "object" && "message" in errors.items && (
               <p className="text-xs text-destructive px-4 py-2">{String(errors.items.message)}</p>
             )}
@@ -324,8 +369,8 @@ export function StockOutForm({ settings, existingEntry, isEdit, resetSignal }: S
 
         <Separator />
 
-        <div className="flex flex-col-reverse sm:flex-row justify-end gap-3">
-          <Button type="button" variant="outline" onClick={() => router.back()} disabled={loading !== null} className="cursor-pointer">
+        <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3">
+          <Button type="button" variant="ghost" onClick={() => router.back()} disabled={loading !== null} className="cursor-pointer text-muted-foreground h-11 sm:h-9">
             Cancel
           </Button>
           {(!isEdit || isDraftEntry) && (
@@ -336,12 +381,12 @@ export function StockOutForm({ settings, existingEntry, isEdit, resetSignal }: S
                 return
               }
               onSubmit(values, "draft")
-            }} disabled={loading !== null} className="gap-2 cursor-pointer">
+            }} disabled={loading !== null} className="gap-2 cursor-pointer h-11 sm:h-9">
               {loading === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
               Save as Draft
             </Button>
           )}
-          <Button type="button" onClick={() => handleSubmit((data) => onSubmit(data, "done"))()} disabled={loading !== null} className="gap-2 cursor-pointer">
+          <Button type="button" onClick={() => handleSubmit((data) => onSubmit(data, "done"))()} disabled={loading !== null} className="gap-2 cursor-pointer h-11 sm:h-9 text-base sm:text-sm font-semibold sm:font-medium">
             {loading === "done" ? <Loader2 className="h-4 w-4 animate-spin" /> : isEdit && isDraftEntry ? <CheckCircle className="h-4 w-4" /> : <Save className="h-4 w-4" />}
             {isEdit ? isDraftEntry ? "Submit Entry" : "Save Changes" : "Create Entry"}
           </Button>
