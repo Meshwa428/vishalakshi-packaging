@@ -1,12 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef } from "react"
 import { Trash2 } from "lucide-react"
 import { useFormContext, useWatch } from "react-hook-form"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
-import { createClient } from "@/lib/supabase/client"
+import { ReelCombobox, type ReelOption } from "@/components/stock-entry/ReelCombobox"
 import type { AppSettings } from "@/types"
 
 interface StockOutItemRowProps {
@@ -18,19 +18,8 @@ interface StockOutItemRowProps {
   mobile?: boolean
 }
 
-interface ReelOption {
-  reel_no: string
-  size: string | null
-  type: string | null
-  bf: string | null
-  quality: string | null
-  weight: number | null
-}
-
 export function StockOutItemRow({ index, settings, onRemove, canRemove, onEnterKey, mobile }: StockOutItemRowProps) {
   const { register, setValue, control } = useFormContext()
-  const [reelOptions, setReelOptions] = useState<ReelOption[]>([])
-  const [loadingReels, setLoadingReels] = useState(false)
 
   const gsmVal = useWatch({ control, name: `items.${index}.gsm` })
   const reelVal = useWatch({ control, name: `items.${index}.reel_no` })
@@ -40,46 +29,29 @@ export function StockOutItemRow({ index, settings, onRemove, canRemove, onEnterK
   const qualityVal = useWatch({ control, name: `items.${index}.quality` })
   const weightVal = useWatch({ control, name: `items.${index}.weight` })
 
-  // Fetch available reels when GSM changes
+  // Clear the reel + auto-filled fields when GSM *changes* (not on first mount,
+  // so prefilled edit values survive).
+  const prevGsm = useRef(gsmVal)
   useEffect(() => {
-    if (!gsmVal) {
-      setReelOptions([])
-      return
-    }
-    setLoadingReels(true)
-    // Reset dependant fields when GSM changes
+    if (prevGsm.current === gsmVal) return
+    prevGsm.current = gsmVal
     setValue(`items.${index}.reel_no`, "")
     setValue(`items.${index}.size`, "")
     setValue(`items.${index}.type`, "")
     setValue(`items.${index}.bf`, "")
     setValue(`items.${index}.quality`, "")
-
-    const supabase = createClient()
-    supabase
-      .from("stock_entry_items")
-      .select("reel_no, size, type, bf, quality, weight")
-      .eq("gsm", gsmVal)
-      .order("reel_no")
-      .then(({ data }: { data: ReelOption[] | null }) => {
-        setReelOptions(data ?? [])
-        setLoadingReels(false)
-      })
+    setValue(`items.${index}.weight`, null)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gsmVal])
 
-  const handleReelSelect = (reel_no: string) => {
-    const reel = reelOptions.find((r) => r.reel_no === reel_no)
-    if (reel) {
-      setValue(`items.${index}.reel_no`, reel_no)
-      setValue(`items.${index}.size`, reel.size ?? "")
-      setValue(`items.${index}.type`, reel.type ?? "")
-      setValue(`items.${index}.bf`, reel.bf ?? "")
-      setValue(`items.${index}.quality`, reel.quality ?? "")
-      // Auto-fill weight from stock in record (complete stock in/out, no partials)
-      if (reel.weight != null) {
-        setValue(`items.${index}.weight`, reel.weight)
-      }
-    }
+  const handleReelSelect = (reel: ReelOption | null) => {
+    setValue(`items.${index}.reel_no`, reel?.reel_no ?? "")
+    setValue(`items.${index}.size`, reel?.size ?? "")
+    setValue(`items.${index}.type`, reel?.type ?? "")
+    setValue(`items.${index}.bf`, reel?.bf ?? "")
+    setValue(`items.${index}.quality`, reel?.quality ?? "")
+    // Auto-fill weight from the stock-in record (complete in/out, no partials)
+    setValue(`items.${index}.weight`, reel?.weight ?? null)
   }
 
   // ── Mobile card layout ──────────────────────────────────────────
@@ -126,29 +98,18 @@ export function StockOutItemRow({ index, settings, onRemove, canRemove, onEnterK
             <input type="hidden" {...register(`items.${index}.gsm`)} />
           </div>
 
-          {/* Reel No — enabled only after GSM selected */}
+          {/* Reel No — searchable, enabled only after GSM selected */}
           <div className="space-y-1.5">
             <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
               Reel No <span className="text-destructive">*</span>
             </label>
-            <Select
+            <ReelCombobox
+              gsm={gsmVal}
               value={reelVal || ""}
-              onValueChange={handleReelSelect}
-              disabled={!gsmVal || loadingReels}
-            >
-              <SelectTrigger className="h-11 text-sm">
-                <SelectValue placeholder={
-                  !gsmVal ? "Select GSM first" :
-                  loadingReels ? "Loading reels…" :
-                  reelOptions.length === 0 ? "No reels available" : "Select reel"
-                } />
-              </SelectTrigger>
-              <SelectContent>
-                {reelOptions.map((r) => (
-                  <SelectItem key={r.reel_no} value={r.reel_no}>{r.reel_no}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              disabled={!gsmVal}
+              onSelect={handleReelSelect}
+              inputClassName="h-11"
+            />
             <input type="hidden" {...register(`items.${index}.reel_no`)} />
           </div>
 
@@ -219,26 +180,15 @@ export function StockOutItemRow({ index, settings, onRemove, canRemove, onEnterK
         <input type="hidden" {...register(`items.${index}.gsm`)} />
       </td>
 
-      {/* Reel No — dropdown filtered by GSM */}
+      {/* Reel No — searchable, filtered by GSM */}
       <td className="py-2 px-2">
-        <Select
+        <ReelCombobox
+          gsm={gsmVal}
           value={reelVal || ""}
-          onValueChange={handleReelSelect}
-          disabled={!gsmVal || loadingReels}
-        >
-          <SelectTrigger className="h-9 text-sm w-32">
-            <SelectValue placeholder={
-              !gsmVal ? "Select GSM first" :
-              loadingReels ? "Loading..." :
-              reelOptions.length === 0 ? "No reels" : "Reel #"
-            } />
-          </SelectTrigger>
-          <SelectContent>
-            {reelOptions.map((r) => (
-              <SelectItem key={r.reel_no} value={r.reel_no}>{r.reel_no}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          disabled={!gsmVal}
+          onSelect={handleReelSelect}
+          className="w-36"
+        />
         <input type="hidden" {...register(`items.${index}.reel_no`)} />
       </td>
 

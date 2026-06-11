@@ -121,6 +121,11 @@ Update after every major change so future debugging sessions have full context.
   - Browser Supabase client is now a **singleton** (`lib/supabase/client.ts`) — avoids duplicate auth listeners / refresh timers per page.
   - Stale-while-revalidate **module caches** for `useSettings`, `usePartySuggestions`, `ProfileProvider`, and the stock-entries list page — render last-known data instantly, refresh in the background instead of showing a skeleton on every visit. Caches are module-level (cleared on full reload), which is the right scope for this 3-user app.
 
+### [2026-06-11] Stock Out reel picker — searchable server-side combobox
+- **Problem**: The reel-number selector was a `<Select>` that pre-fetched **every** reel for the chosen GSM. Doesn't scale (imagine 1M reels) and there was no way to type-search.
+- **Fix**: New `components/stock-entry/ReelCombobox.tsx` — a Base UI `Combobox` (`@base-ui/react/combobox`) with `filter={null}` so filtering is **server-side**. As the user types it queries `stock_entry_items` scoped to the selected GSM, `ilike '%query%'`, `limit(50)`, debounced 250ms, with a request-id guard against out-of-order responses. Picking a reel returns the full row so the form auto-fills size/type/bf/quality/weight (unchanged behavior).
+- **StockOutItemRow**: dropped the prefetch `useEffect` + `reelOptions` state. GSM-change now only clears the dependent fields — and skips the first mount (via a `prevGsm` ref) so prefilled edit values survive. Both desktop and mobile use `<ReelCombobox>`; the hidden registered `reel_no` input is retained for RHF.
+
 ### [2026-06-11] Reel-row animations removed
 - The framer-motion enter/exit/layout animations on reel rows (`ItemRow`, `StockOutItemRow`) and their `AnimatePresence` wrappers in both forms were removed per request — adding/removing rows is now instant. `EntryList` animations are unchanged.
 
@@ -141,7 +146,8 @@ Update after every major change so future debugging sessions have full context.
 | `.env.local.example` | All required env vars |
 | `components/stock-entry/EntryForm.tsx` | Stock In create/edit form (pre-checks invoice + reel uniqueness) |
 | `components/stock-entry/StockOutForm.tsx` | Stock Out create/edit form (pre-checks invoice uniqueness) |
-| `components/stock-entry/StockOutItemRow.tsx` | Stock Out item row (GSM → Reel dropdown + auto-fill) |
+| `components/stock-entry/StockOutItemRow.tsx` | Stock Out item row (GSM → searchable Reel combobox + auto-fill) |
+| `components/stock-entry/ReelCombobox.tsx` | Searchable, server-side reel-number picker (debounced, GSM-scoped) |
 | `components/settings/EnumManager.tsx` | Admin dropdown option manager |
 | `components/reports/StockReport.tsx` | Reel-wise stock report table + Excel download |
 | `components/reports/DateRangeSelector.tsx` | From/To date inputs + Generate button |
