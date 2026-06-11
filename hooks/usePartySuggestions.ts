@@ -25,10 +25,11 @@ export function usePartySuggestions(settings: AppSettings) {
       supabase.from("stock_entries").select("party_name"),
       supabase.from("stock_out_entries").select("party_name"),
     ]).then(([stockIn, stockOut]) => {
-      const names = [
-        ...(stockIn.data ?? []),
-        ...(stockOut.data ?? []),
+      const rows = [
+        ...((stockIn.data ?? []) as { party_name: string | null }[]),
+        ...((stockOut.data ?? []) as { party_name: string | null }[]),
       ]
+      const names = rows
         .map((r) => (r.party_name ?? "").trim())
         .filter(Boolean)
       dbNamesCache = names

@@ -53,9 +53,9 @@ export default function StockEntryDetailPage() {
         .select(`*, stock_entry_items(*), profiles(full_name)`)
         .eq("id", id)
         .single()
-        .then(({ data, error }) => {
+        .then(({ data, error }: { data: FullStockInEntry | null; error: unknown }) => {
           if (error || !data) { logger.error("Stock in entry not found", { id, error }); router.replace("/stock-entries"); return }
-          setStockInEntry(data as FullStockInEntry)
+          setStockInEntry(data)
           setLoading(false)
         })
     } else {
@@ -64,9 +64,9 @@ export default function StockEntryDetailPage() {
         .select(`*, stock_out_items(*), profiles(full_name)`)
         .eq("id", id)
         .single()
-        .then(({ data, error }) => {
+        .then(({ data, error }: { data: FullStockOutEntry | null; error: unknown }) => {
           if (error || !data) { logger.error("Stock out entry not found", { id, error }); router.replace("/stock-entries"); return }
-          setStockOutEntry(data as FullStockOutEntry)
+          setStockOutEntry(data)
           setLoading(false)
         })
     }

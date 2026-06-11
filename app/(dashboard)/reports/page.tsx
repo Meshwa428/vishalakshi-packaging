@@ -57,7 +57,14 @@ export default function ReportsPage() {
       if (inError) { logger.error("Failed to fetch stock in for report", inError); return }
 
       // Flatten to per-item rows
-      const flatIn: StockInItemRaw[] = (inItems ?? []).flatMap((entry) =>
+      type RawEntry = {
+        id: string
+        invoice_number: string
+        date: string
+        party_name: string
+        stock_entry_items: StockEntryItem[] | null
+      }
+      const flatIn: StockInItemRaw[] = ((inItems ?? []) as RawEntry[]).flatMap((entry) =>
         (entry.stock_entry_items ?? []).map((item) => ({
           ...item,
           stock_entries: {

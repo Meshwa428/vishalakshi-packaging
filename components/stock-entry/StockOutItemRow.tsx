@@ -60,7 +60,7 @@ export function StockOutItemRow({ index, settings, onRemove, canRemove, onEnterK
       .select("reel_no, size, type, bf, quality, weight")
       .eq("gsm", gsmVal)
       .order("reel_no")
-      .then(({ data }) => {
+      .then(({ data }: { data: ReelOption[] | null }) => {
         setReelOptions(data ?? [])
         setLoadingReels(false)
       })

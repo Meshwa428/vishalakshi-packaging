@@ -169,7 +169,7 @@ export function EntryForm({ settings, existingEntry, isEdit, resetSignal }: Entr
           .select("reel_no")
           .in("reel_no", reelNosToCheck)
         if (dupeReels && dupeReels.length > 0) {
-          const dupeList = dupeReels.map((r) => r.reel_no).join(", ")
+          const dupeList = (dupeReels as { reel_no: string }[]).map((r) => r.reel_no).join(", ")
           toast.error(`Reel number(s) already exist in another entry: ${dupeList}`)
           setLoading(null)
           return

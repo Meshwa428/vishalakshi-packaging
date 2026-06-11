@@ -28,7 +28,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     const supabase = createClient()
     // getClaims() reads the user id from the locally-verified JWT — no network
     // call just to learn who we are before fetching the profile row.
-    supabase.auth.getClaims().then(async ({ data }) => {
+    ;(async () => {
+      const { data } = await supabase.auth.getClaims()
       const userId = data?.claims?.sub ?? null
       if (!userId) { setLoading(false); return }
       const { data: row } = await supabase
@@ -36,10 +37,10 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         .select("*")
         .eq("id", userId)
         .single()
-      profileCache = row
-      setProfile(row)
+      profileCache = row as Profile | null
+      setProfile(row as Profile | null)
       setLoading(false)
-    })
+    })()
   }, [])
 
   return (

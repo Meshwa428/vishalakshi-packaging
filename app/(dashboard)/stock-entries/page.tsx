@@ -10,7 +10,7 @@ import { EntryList } from "@/components/stock-entry/EntryList"
 import { createClient } from "@/lib/supabase/client"
 import { useProfileContext } from "@/components/shared/ProfileProvider"
 import { logger } from "@/lib/logger"
-import type { UnifiedListEntry } from "@/types"
+import type { UnifiedListEntry, EntryStatus } from "@/types"
 
 // Cached list — show the last-known entries immediately on navigation, then
 // refresh in the background. Avoids a full-screen skeleton every visit.
@@ -38,7 +38,18 @@ export default function StockEntriesPage() {
       if (stockIn.error) logger.error("Failed to fetch stock in entries", stockIn.error)
       if (stockOut.error) logger.error("Failed to fetch stock out entries", stockOut.error)
 
-      const inEntries: UnifiedListEntry[] = (stockIn.data ?? []).map((e) => ({
+      type RawListRow = {
+        id: string
+        invoice_number: string
+        date: string
+        truck_number: string | null
+        party_name: string | null
+        status: EntryStatus
+        stock_entry_items?: { id: string }[] | null
+        stock_out_items?: { id: string }[] | null
+      }
+
+      const inEntries: UnifiedListEntry[] = ((stockIn.data ?? []) as RawListRow[]).map((e) => ({
         id: e.id,
         invoice_number: e.invoice_number,
         date: e.date,
@@ -46,10 +57,10 @@ export default function StockEntriesPage() {
         party_name: e.party_name,
         status: e.status,
         entry_type: "stock_in",
-        items_count: (e.stock_entry_items as { id: string }[] | null)?.length ?? 0,
+        items_count: e.stock_entry_items?.length ?? 0,
       }))
 
-      const outEntries: UnifiedListEntry[] = (stockOut.data ?? []).map((e) => ({
+      const outEntries: UnifiedListEntry[] = ((stockOut.data ?? []) as RawListRow[]).map((e) => ({
         id: e.id,
         invoice_number: e.invoice_number,
         date: e.date,
@@ -57,7 +68,7 @@ export default function StockEntriesPage() {
         party_name: e.party_name,
         status: e.status,
         entry_type: "stock_out",
-        items_count: (e.stock_out_items as { id: string }[] | null)?.length ?? 0,
+        items_count: e.stock_out_items?.length ?? 0,
       }))
 
       // Merge and sort by date descending

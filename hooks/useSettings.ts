@@ -26,7 +26,7 @@ export function useSettings() {
     const { data } = await supabase.from("app_settings").select("setting_key, setting_values")
     if (data && data.length > 0) {
       const merged = { ...defaultSettings }
-      data.forEach((row) => {
+      ;(data as { setting_key: string; setting_values: string[] }[]).forEach((row) => {
         const key = row.setting_key as keyof AppSettings
         if (key in merged) merged[key] = row.setting_values as string[]
       })
