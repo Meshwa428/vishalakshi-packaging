@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { motion } from "framer-motion"
 import { Trash2 } from "lucide-react"
 import { useFormContext, useWatch } from "react-hook-form"
 import { Input } from "@/components/ui/input"
@@ -87,14 +86,7 @@ export function StockOutItemRow({ index, settings, onRemove, canRemove, onEnterK
   if (mobile) {
     const num = String(index + 1).padStart(2, "0")
     return (
-      <motion.div
-        layout
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -6, scale: 0.98 }}
-        transition={{ duration: 0.18, ease: "easeOut" }}
-        className="rounded-xl border bg-card overflow-hidden"
-      >
+      <div className="rounded-xl border bg-card overflow-hidden">
         {/* Card header */}
         <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
           <div className="flex items-center gap-2.5">
@@ -197,20 +189,13 @@ export function StockOutItemRow({ index, settings, onRemove, canRemove, onEnterK
         <input type="hidden" {...register(`items.${index}.bf`)} />
         <input type="hidden" {...register(`items.${index}.quality`)} />
         <input type="hidden" {...register(`items.${index}.weight`, { valueAsNumber: true })} />
-      </motion.div>
+      </div>
     )
   }
 
   // ── Desktop table row ────────────────────────────────────────────
   return (
-    <motion.tr
-      layout
-      initial={{ opacity: 0, y: -8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.15 }}
-      className="border-b last:border-0"
-    >
+    <tr className="border-b last:border-0">
       {/* Serial No */}
       <td className="py-2 px-3 text-sm text-muted-foreground text-center w-10 shrink-0">
         {index + 1}
@@ -324,6 +309,6 @@ export function StockOutItemRow({ index, settings, onRemove, canRemove, onEnterK
           <Trash2 className="h-3.5 w-3.5" />
         </Button>
       </td>
-    </motion.tr>
+    </tr>
   )
 }

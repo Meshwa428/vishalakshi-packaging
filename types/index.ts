@@ -47,7 +47,7 @@ export interface StockOutEntry {
   invoice_number: string
   date: string
   truck_number: string | null
-  party_name: string
+  party_name: string | null
   shipped_from: string | null
   delivery_address: string | null
   status: EntryStatus
@@ -78,7 +78,7 @@ export interface UnifiedListEntry {
   invoice_number: string
   date: string
   truck_number: string | null
-  party_name: string
+  party_name: string | null
   status: EntryStatus
   entry_type: EntryType
   items_count: number
@@ -99,6 +99,7 @@ export interface AppSettings {
   gsm_options: string[]
   bf_options: string[]
   quality_options: string[]
+  supplier_options: string[]
 }
 
 export type StockEntryItemInput = Omit<StockEntryItem, 'id' | 'stock_entry_id' | 'created_at'>

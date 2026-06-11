@@ -1,6 +1,5 @@
 "use client"
 
-import { motion } from "framer-motion"
 import { Trash2 } from "lucide-react"
 import { useFormContext, useWatch } from "react-hook-form"
 import { Input } from "@/components/ui/input"
@@ -65,14 +64,7 @@ export function ItemRow({ index, settings, onRemove, canRemove, isReadOnly, onEn
   if (mobile) {
     const num = String(index + 1).padStart(2, "0")
     return (
-      <motion.div
-        layout
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -6, scale: 0.98 }}
-        transition={{ duration: 0.18, ease: "easeOut" }}
-        className="rounded-xl border bg-card overflow-hidden"
-      >
+      <div className="rounded-xl border bg-card overflow-hidden">
         {/* Card header — accent bar + number badge */}
         <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
           <div className="flex items-center gap-2.5">
@@ -172,20 +164,13 @@ export function ItemRow({ index, settings, onRemove, canRemove, isReadOnly, onEn
             </div>
           </div>
         </div>
-      </motion.div>
+      </div>
     )
   }
 
   // ── Desktop table row ────────────────────────────────────────────
   return (
-    <motion.tr
-      layout
-      initial={{ opacity: 0, y: -8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.2 }}
-      className="border-b last:border-0 hover:bg-muted/30 transition-colors"
-    >
+    <tr className="border-b last:border-0 hover:bg-muted/30 transition-colors">
       {/* Reel No */}
       <td className="py-2 px-2 min-w-[110px]">
         {isReadOnly ? (
@@ -266,6 +251,6 @@ export function ItemRow({ index, settings, onRemove, canRemove, isReadOnly, onEn
           </Button>
         </td>
       )}
-    </motion.tr>
+    </tr>
   )
 }

@@ -53,10 +53,11 @@ export function EnumManager({ categories: initialCategories }: EnumManagerProps)
     logger.info("Saving app_settings", { key, values })
     try {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: claimsData } = await supabase.auth.getClaims()
+      const userId = claimsData?.claims?.sub ?? null
       const { error } = await supabase
         .from("app_settings")
-        .upsert({ setting_key: key, setting_values: values, updated_by: user?.id, updated_at: new Date().toISOString() }, { onConflict: "setting_key" })
+        .upsert({ setting_key: key, setting_values: values, updated_by: userId, updated_at: new Date().toISOString() }, { onConflict: "setting_key" })
 
       if (error) {
         logger.error("Failed to save settings", error)

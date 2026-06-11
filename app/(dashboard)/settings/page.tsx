@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS = {
   gsm_options: { label: "GSM", description: "GSM value options" },
   bf_options: { label: "BF", description: "Burst Factor value options" },
   quality_options: { label: "Quality", description: "Quality grade options" },
+  supplier_options: { label: "Suppliers", description: "Party / supplier names suggested in the Stock In form" },
 }
 
 export default function SettingsPage() {

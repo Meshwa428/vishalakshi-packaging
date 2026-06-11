@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import { useForm, FormProvider, useFieldArray, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { AnimatePresence } from "framer-motion"
 import { Plus, Loader2, Save, FileText, CheckCircle } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -28,17 +27,28 @@ const stockOutItemSchema = z.object({
   weight: z.number().nullable().optional(),
 })
 
+// Stock Out only collects the date manually — the rest (reel details) comes
+// from the selected Stock In reel, and the invoice number is auto-generated.
 const formSchema = z.object({
-  invoice_number: z.string().min(1, "Invoice number is required"),
   date: z.string().min(1, "Date is required"),
-  truck_number: z.string(),
-  party_name: z.string().min(1, "Party name is required"),
-  shipped_from: z.string(),
-  delivery_address: z.string(),
   items: z.array(stockOutItemSchema).min(1, "At least one reel entry is required"),
 })
 
 type FormData = z.infer<typeof formSchema>
+
+// Generates the next sequential Stock Out reference, e.g. "SO-0001".
+// The SO- prefix keeps these globally unique vs. Stock In invoice numbers.
+async function generateStockOutInvoice(
+  supabase: ReturnType<typeof createClient>
+): Promise<string> {
+  const { data } = await supabase.from("stock_out_entries").select("invoice_number")
+  let max = 0
+  for (const row of data ?? []) {
+    const m = /^SO-(\d+)$/.exec(row.invoice_number ?? "")
+    if (m) max = Math.max(max, parseInt(m[1], 10))
+  }
+  return `SO-${String(max + 1).padStart(4, "0")}`
+}
 
 interface StockOutFormProps {
   settings: AppSettings
@@ -89,12 +99,7 @@ export function StockOutForm({ settings, existingEntry, isEdit, resetSignal }: S
   const methods = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: existingEntry ? {
-      invoice_number: existingEntry.invoice_number,
       date: existingEntry.date,
-      truck_number: existingEntry.truck_number ?? "",
-      party_name: existingEntry.party_name,
-      shipped_from: existingEntry.shipped_from ?? "",
-      delivery_address: existingEntry.delivery_address ?? "",
       items: existingEntry.stock_out_items.map((i) => ({
         gsm: i.gsm ?? "",
         reel_no: i.reel_no,
@@ -105,12 +110,7 @@ export function StockOutForm({ settings, existingEntry, isEdit, resetSignal }: S
         weight: i.weight,
       })),
     } : {
-      invoice_number: "",
       date: new Date().toISOString().split("T")[0],
-      truck_number: "",
-      party_name: "",
-      shipped_from: "",
-      delivery_address: "",
       items: [emptyItem()],
     },
   })
@@ -122,54 +122,32 @@ export function StockOutForm({ settings, existingEntry, isEdit, resetSignal }: S
   useEffect(() => {
     if (!resetSignal) return
     methods.reset({
-      invoice_number: "",
       date: new Date().toISOString().split("T")[0],
-      truck_number: "",
-      party_name: "",
-      shipped_from: "",
-      delivery_address: "",
       items: [emptyItem()],
     })
   }, [resetSignal]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const onSubmit = async (data: FormData, status: EntryStatus) => {
     setLoading(status)
-    logger.info("Submitting stock out entry", { invoiceNo: data.invoice_number, status })
+    logger.info("Submitting stock out entry", { status, isEdit })
     try {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { toast.error("Session expired. Please sign in again."); return }
+      const { data: claimsData } = await supabase.auth.getClaims()
+      const userId = claimsData?.claims?.sub ?? null
+      if (!userId) { toast.error("Session expired. Please sign in again."); return }
 
       // For drafts, filter out incomplete reel rows
       const effectiveItems = status === "draft"
         ? (data.items ?? []).filter(item => item.reel_no?.trim())
         : data.items
 
-      // Cross-table invoice uniqueness check
-      // Skip if editing and the invoice number hasn't changed
-      const invoiceChanged = !isEdit || (existingEntry && existingEntry.invoice_number !== data.invoice_number)
-      if (invoiceChanged) {
-        const { count: inCount } = await supabase
-          .from("stock_entries")
-          .select("id", { count: "exact", head: true })
-          .eq("invoice_number", data.invoice_number)
-        if ((inCount ?? 0) > 0) {
-          toast.error(`Invoice number "${data.invoice_number}" already exists in a Stock In entry.`)
-          setLoading(null)
-          return
-        }
-      }
-
       if (isEdit && existingEntry) {
+        // Only the date and reel list are editable now — invoice number and any
+        // legacy header fields are preserved untouched.
         const { error: headerError } = await supabase
           .from("stock_out_entries")
           .update({
-            invoice_number: data.invoice_number,
             date: data.date,
-            truck_number: data.truck_number || null,
-            party_name: data.party_name,
-            shipped_from: data.shipped_from || null,
-            delivery_address: data.delivery_address || null,
             status,
             updated_at: new Date().toISOString(),
           })
@@ -196,28 +174,32 @@ export function StockOutForm({ settings, existingEntry, isEdit, resetSignal }: S
         toast.success(status === "done" ? "Stock Out entry updated!" : "Draft saved!")
         router.push(`/stock-entries/${existingEntry.id}?type=stock_out`)
       } else {
-        const { data: entry, error: headerError } = await supabase
-          .from("stock_out_entries")
-          .insert({
-            invoice_number: data.invoice_number,
-            date: data.date,
-            truck_number: data.truck_number || null,
-            party_name: data.party_name,
-            shipped_from: data.shipped_from || null,
-            delivery_address: data.delivery_address || null,
-            status,
-            created_by: user.id,
-          })
-          .select()
-          .single()
+        // Auto-generate the invoice number; retry on the rare collision when two
+        // entries are created at the same instant (unique constraint hit).
+        let entry: { id: string } | null = null
+        let headerError: { code?: string } | null = null
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const invoice_number = await generateStockOutInvoice(supabase)
+          const res = await supabase
+            .from("stock_out_entries")
+            .insert({
+              invoice_number,
+              date: data.date,
+              party_name: null,
+              status,
+              created_by: userId,
+            })
+            .select()
+            .single()
+          if (res.error?.code === "23505") { headerError = res.error; continue }
+          entry = res.data
+          headerError = res.error
+          break
+        }
 
         if (headerError || !entry) {
           logger.error("Failed to create stock out entry", headerError)
-          if (headerError?.code === "23505") {
-            toast.error(`Invoice number "${data.invoice_number}" already exists.`)
-          } else {
-            toast.error("Failed to create entry. Please try again.")
-          }
+          toast.error("Failed to create entry. Please try again.")
           return
         }
 
@@ -250,35 +232,24 @@ export function StockOutForm({ settings, existingEntry, isEdit, resetSignal }: S
             <CardTitle className="text-base">Entry Details</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="invoice_number">Invoice Number *</Label>
-                <Input id="invoice_number" placeholder="001" {...register("invoice_number")} />
-                {errors.invoice_number && <p className="text-xs text-destructive">{errors.invoice_number.message}</p>}
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="date">Date *</Label>
                 <Input id="date" type="date" {...register("date")} />
                 {errors.date && <p className="text-xs text-destructive">{errors.date.message}</p>}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="truck_number">Truck Number</Label>
-                <Input id="truck_number" placeholder="GJ 18 VA 5423" {...register("truck_number")} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="party_name">Party Name *</Label>
-                <Input id="party_name" placeholder="Customer / Supplier name" {...register("party_name")} />
-                {errors.party_name && <p className="text-xs text-destructive">{errors.party_name.message}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="shipped_from">Shipped From</Label>
-                <Input id="shipped_from" placeholder="Origin location" {...register("shipped_from")} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="delivery_address">Delivery Address</Label>
-                <Input id="delivery_address" placeholder="Delivery location" {...register("delivery_address")} />
-              </div>
+              {isEdit && existingEntry && (
+                <div className="space-y-2">
+                  <Label htmlFor="invoice_number">Invoice Number</Label>
+                  <Input id="invoice_number" value={existingEntry.invoice_number} readOnly className="bg-muted/50 cursor-default font-mono" />
+                </div>
+              )}
             </div>
+            {!isEdit && (
+              <p className="text-xs text-muted-foreground mt-3">
+                Invoice number is assigned automatically. All reel details are pulled from the selected stock — just pick the GSM and reel number below.
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -294,7 +265,6 @@ export function StockOutForm({ settings, existingEntry, isEdit, resetSignal }: S
           <CardContent className="p-0">
             {/* ── Mobile card list (sm and below) ── */}
             <div className="sm:hidden p-3 space-y-3">
-              <AnimatePresence initial={false}>
                 {fields.map((field, index) => (
                   <StockOutItemRow
                     key={field.id}
@@ -306,7 +276,6 @@ export function StockOutForm({ settings, existingEntry, isEdit, resetSignal }: S
                     onEnterKey={() => append(emptyItem())}
                   />
                 ))}
-              </AnimatePresence>
 
               {/* Inline "Add Reel" — below last card */}
               <button
@@ -343,7 +312,6 @@ export function StockOutForm({ settings, existingEntry, isEdit, resetSignal }: S
                   </tr>
                 </thead>
                 <tbody>
-                  <AnimatePresence initial={false}>
                     {fields.map((field, index) => (
                       <StockOutItemRow
                         key={field.id}
@@ -354,7 +322,6 @@ export function StockOutForm({ settings, existingEntry, isEdit, resetSignal }: S
                         onEnterKey={() => append(emptyItem())}
                       />
                     ))}
-                  </AnimatePresence>
                   <TotalsRow control={control} />
                 </tbody>
               </table>
@@ -376,8 +343,8 @@ export function StockOutForm({ settings, existingEntry, isEdit, resetSignal }: S
           {(!isEdit || isDraftEntry) && (
             <Button type="button" variant="outline" onClick={() => {
               const values = methods.getValues()
-              if (!values.invoice_number?.trim()) {
-                toast.error("Invoice number is required to save as draft.")
+              if (!values.date?.trim()) {
+                toast.error("Date is required to save as draft.")
                 return
               }
               onSubmit(values, "draft")

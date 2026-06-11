@@ -187,10 +187,11 @@ export default function StockEntryDetailPage() {
         {entry.status === "draft" && <DraftBanner isAdmin={isAdmin} />}
         <SummaryCards items={[
           { label: "Date", value: formatDate(entry.date) },
-          { label: "Party Name", value: entry.party_name },
-          { label: "Truck No", value: entry.truck_number ?? "—" },
-          { label: "Shipped From", value: entry.shipped_from ?? "—" },
-          { label: "Delivery Address", value: entry.delivery_address ?? "—" },
+          // Legacy fields — only shown for older entries that still have them.
+          ...(entry.party_name ? [{ label: "Party Name", value: entry.party_name }] : []),
+          ...(entry.truck_number ? [{ label: "Truck No", value: entry.truck_number }] : []),
+          ...(entry.shipped_from ? [{ label: "Shipped From", value: entry.shipped_from }] : []),
+          ...(entry.delivery_address ? [{ label: "Delivery Address", value: entry.delivery_address }] : []),
           { label: "Total Reels", value: String(items.length) },
           { label: "Total Weight", value: `${totalWeight.toFixed(2)} kg` },
           { label: "Created By", value: entry.profiles?.full_name ?? "—" },

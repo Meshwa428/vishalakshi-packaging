@@ -12,10 +12,14 @@ import { useProfileContext } from "@/components/shared/ProfileProvider"
 import { logger } from "@/lib/logger"
 import type { UnifiedListEntry } from "@/types"
 
+// Cached list — show the last-known entries immediately on navigation, then
+// refresh in the background. Avoids a full-screen skeleton every visit.
+let entriesCache: UnifiedListEntry[] | null = null
+
 export default function StockEntriesPage() {
   const { isAdmin } = useProfileContext()
-  const [entries, setEntries] = useState<UnifiedListEntry[]>([])
-  const [loading, setLoading] = useState(true)
+  const [entries, setEntries] = useState<UnifiedListEntry[]>(entriesCache ?? [])
+  const [loading, setLoading] = useState(!entriesCache)
 
   useEffect(() => {
     const supabase = createClient()
@@ -60,6 +64,7 @@ export default function StockEntriesPage() {
       const merged = [...inEntries, ...outEntries].sort(
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
       )
+      entriesCache = merged
       setEntries(merged)
       setLoading(false)
     })

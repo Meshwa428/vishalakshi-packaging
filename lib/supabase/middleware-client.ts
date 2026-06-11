@@ -25,32 +25,35 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // getClaims() verifies the JWT locally (no network round-trip) when the
+  // project uses asymmetric JWT signing keys, and still refreshes the session
+  // cookie. This runs on every navigation, so avoiding the getUser() network
+  // call to Supabase Auth is the single biggest navigation-latency win.
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const userId = claimsData?.claims?.sub ?? null
 
   const { pathname } = request.nextUrl
 
   // Unauthenticated user trying to access protected route
-  if (!user && pathname !== "/login") {
+  if (!userId && pathname !== "/login") {
     const url = request.nextUrl.clone()
     url.pathname = "/login"
     return NextResponse.redirect(url)
   }
 
   // Authenticated user trying to visit login
-  if (user && pathname === "/login") {
+  if (userId && pathname === "/login") {
     const url = request.nextUrl.clone()
     url.pathname = "/stock-entries"
     return NextResponse.redirect(url)
   }
 
   // Settings page: admin only
-  if (user && pathname.startsWith("/settings")) {
+  if (userId && pathname.startsWith("/settings")) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single()
 
     if (profile?.role !== "admin") {

@@ -16,20 +16,28 @@ const ProfileContext = createContext<ProfileContextValue>({
   isAdmin: false,
 })
 
+// Cached across remounts so the role is available instantly and we don't
+// re-query profiles on every full page load.
+let profileCache: Profile | null = null
+
 export function ProfileProvider({ children }: { children: ReactNode }) {
-  const [profile, setProfile] = useState<Profile | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [profile, setProfile] = useState<Profile | null>(profileCache)
+  const [loading, setLoading] = useState(!profileCache)
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user) { setLoading(false); return }
-      const { data } = await supabase
+    // getClaims() reads the user id from the locally-verified JWT — no network
+    // call just to learn who we are before fetching the profile row.
+    supabase.auth.getClaims().then(async ({ data }) => {
+      const userId = data?.claims?.sub ?? null
+      if (!userId) { setLoading(false); return }
+      const { data: row } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", user.id)
+        .eq("id", userId)
         .single()
-      setProfile(data)
+      profileCache = row
+      setProfile(row)
       setLoading(false)
     })
   }, [])

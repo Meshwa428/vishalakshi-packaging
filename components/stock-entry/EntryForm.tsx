@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import { useForm, FormProvider, useFieldArray, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { AnimatePresence } from "framer-motion"
 import { Plus, Loader2, Save, FileText, CheckCircle } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -15,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { ItemRow } from "@/components/stock-entry/ItemRow"
 import { createClient } from "@/lib/supabase/client"
+import { usePartySuggestions } from "@/hooks/usePartySuggestions"
 import { logger } from "@/lib/logger"
 import type { AppSettings, StockEntry, StockEntryItem, EntryStatus } from "@/types"
 
@@ -79,6 +79,7 @@ function MobileTotals({ control }: { control: ReturnType<typeof useForm<FormData
 export function EntryForm({ settings, existingEntry, isEdit, resetSignal }: EntryFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState<"draft" | "done" | null>(null)
+  const partySuggestions = usePartySuggestions(settings)
 
   const methods = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -131,8 +132,9 @@ export function EntryForm({ settings, existingEntry, isEdit, resetSignal }: Entr
     logger.info("Submitting stock entry", { invoiceNo: data.invoice_number, status, isEdit })
     try {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { toast.error("Session expired. Please sign in again."); return }
+      const { data: claimsData } = await supabase.auth.getClaims()
+      const userId = claimsData?.claims?.sub ?? null
+      if (!userId) { toast.error("Session expired. Please sign in again."); return }
 
       // For drafts, filter out incomplete reel rows (empty reel_no) — allows partial saves
       const effectiveItems = status === "draft"
@@ -225,7 +227,7 @@ export function EntryForm({ settings, existingEntry, isEdit, resetSignal }: Entr
             shipped_from: data.shipped_from || null,
             delivery_address: data.delivery_address || null,
             status,
-            created_by: user.id,
+            created_by: userId,
           })
           .select()
           .single()
@@ -293,7 +295,18 @@ export function EntryForm({ settings, existingEntry, isEdit, resetSignal }: Entr
 
               <div className="space-y-2">
                 <Label htmlFor="party_name">Party Name *</Label>
-                <Input id="party_name" placeholder="Customer / Supplier name" {...register("party_name")} />
+                <Input
+                  id="party_name"
+                  list="party_name_suggestions"
+                  autoComplete="off"
+                  placeholder="Customer / Supplier name"
+                  {...register("party_name")}
+                />
+                <datalist id="party_name_suggestions">
+                  {partySuggestions.map((name) => (
+                    <option key={name} value={name} />
+                  ))}
+                </datalist>
                 {errors.party_name && <p className="text-xs text-destructive">{errors.party_name.message}</p>}
               </div>
 
@@ -330,7 +343,6 @@ export function EntryForm({ settings, existingEntry, isEdit, resetSignal }: Entr
           <CardContent className="p-0">
             {/* ── Mobile card list (sm and below) ── */}
             <div className="sm:hidden p-3 space-y-3">
-              <AnimatePresence initial={false}>
                 {fields.map((field, index) => (
                   <ItemRow
                     key={field.id}
@@ -342,7 +354,6 @@ export function EntryForm({ settings, existingEntry, isEdit, resetSignal }: Entr
                     onEnterKey={() => append(emptyItem())}
                   />
                 ))}
-              </AnimatePresence>
 
               {/* Inline "Add Reel" — below last card, easy thumb reach */}
               <button
@@ -378,7 +389,6 @@ export function EntryForm({ settings, existingEntry, isEdit, resetSignal }: Entr
                   </tr>
                 </thead>
                 <tbody>
-                  <AnimatePresence initial={false}>
                     {fields.map((field, index) => (
                       <ItemRow
                         key={field.id}
@@ -389,7 +399,6 @@ export function EntryForm({ settings, existingEntry, isEdit, resetSignal }: Entr
                         onEnterKey={() => append(emptyItem())}
                       />
                     ))}
-                  </AnimatePresence>
                   <TotalsRow control={control} />
                 </tbody>
               </table>

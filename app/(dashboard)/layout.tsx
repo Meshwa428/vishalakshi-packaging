@@ -6,14 +6,17 @@ import { logger } from "@/lib/logger"
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // Local JWT verification — the proxy already guards this route over the
+  // network, so a second getUser() round-trip here just slows the first paint.
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const userId = claimsData?.claims?.sub ?? null
 
-  if (!user) {
+  if (!userId) {
     logger.info("Unauthenticated request — redirecting to login")
     redirect("/login")
   }
 
-  logger.info("Dashboard layout — user authenticated", { userId: user.id })
+  logger.info("Dashboard layout — user authenticated", { userId })
 
   return (
     <ProfileProvider>

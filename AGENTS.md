@@ -103,6 +103,27 @@ Update after every major change so future debugging sessions have full context.
 - **Fix**: Both `<EntryForm>` and `<StockOutForm>` are always mounted in `new/page.tsx`. The inactive form gets `className="hidden"` (CSS only — no unmount). React Hook Form state is preserved across tab switches.
 - **Reset button**: Sits top-right of the toggle row. Increments `stockInResetKey` or `stockOutResetKey` (separate per tab). Each form accepts a `resetSignal?: number` prop and watches it in a `useEffect` — calls `methods.reset()` to blank values when the signal increments. The two reset keys are independent.
 
+### [2026-06-11] Stock Out — Date-only header + Auto-generated invoice
+- **Decision**: Stock Out no longer collects Truck/Party/Shipped From/Delivery Address. The operator enters **only the Date**; reel details come from the selected Stock In reel; the invoice number is **auto-generated**. Applies to everyone (admin + operator).
+- **Why**: Those header fields were already captured at Stock In time — re-entering them on Stock Out was redundant.
+- **Invoice format**: `SO-0001` (zero-padded, sequential). Generated in `StockOutForm` via `generateStockOutInvoice()` — reads the current max `SO-####` and increments. The `SO-` prefix keeps it globally unique vs. Stock In invoice numbers (plain digits), so it never collides under the cross-table uniqueness trigger. Insert retries up to 5× on a 23505 collision.
+- **DB**: `stock_out_entries.party_name` made nullable (`supabase/03_stock_out_simplify.sql`). New Stock Out rows insert `party_name = null`. Detail page shows the legacy Party/Truck/etc cards **only if present** (old rows keep their data). `EntryList` guards null party names.
+- **Edit mode**: Only Date + reel list are editable; existing invoice number and any legacy header fields are preserved untouched (the update payload no longer writes them).
+
+### [2026-06-11] Party Name autocomplete (Stock In) + Suppliers setting
+- **Decision**: The Stock In Party Name field is now an autocomplete. Suggestions come from **both** (a) an admin-managed `supplier_options` list in Settings, and (b) distinct party names already used in past entries (auto-remembered).
+- **Implementation**: Native `<datalist>` on the existing `<Input>` (free-text still allowed; no new dependency, works on mobile). `hooks/usePartySuggestions.ts` merges `settings.supplier_options` with distinct DB party names (de-duped case-insensitively, sorted). New `supplier_options` key added to `AppSettings`, `useSettings` defaults, the Settings page, and seeded (back-filled from existing party names) in `03_stock_out_simplify.sql`. The generic `EnumManager` renders the Suppliers card with no code changes.
+
+### [2026-06-11] Performance — local JWT verification + client caches
+- **Problem**: Navigation randomly hung on loading states and buttons felt unresponsive. Root cause: `supabase.auth.getUser()` runs in the proxy on **every** navigation, making a **network round-trip to Supabase Auth** (slow/cold on free tier). The same network call repeated in the layout and `ProfileProvider`.
+- **Fix**:
+  - Replaced `getUser()` with `getClaims()` in `middleware-client.ts`, `(dashboard)/layout.tsx`, `ProfileProvider`, and the form/settings submit paths. `getClaims()` verifies the JWT **locally** (no network) when the project uses asymmetric JWT signing keys. **To get the full benefit, enable asymmetric (ECC) JWT signing keys in the Supabase dashboard** (Project Settings → JWT Keys / Signing Keys). Without it, `getClaims()` falls back to a network call — no worse than before.
+  - Browser Supabase client is now a **singleton** (`lib/supabase/client.ts`) — avoids duplicate auth listeners / refresh timers per page.
+  - Stale-while-revalidate **module caches** for `useSettings`, `usePartySuggestions`, `ProfileProvider`, and the stock-entries list page — render last-known data instantly, refresh in the background instead of showing a skeleton on every visit. Caches are module-level (cleared on full reload), which is the right scope for this 3-user app.
+
+### [2026-06-11] Reel-row animations removed
+- The framer-motion enter/exit/layout animations on reel rows (`ItemRow`, `StockOutItemRow`) and their `AnimatePresence` wrappers in both forms were removed per request — adding/removing rows is now instant. `EntryList` animations are unchanged.
+
 ---
 
 ## Key File Map
@@ -124,7 +145,11 @@ Update after every major change so future debugging sessions have full context.
 | `components/settings/EnumManager.tsx` | Admin dropdown option manager |
 | `components/reports/StockReport.tsx` | Reel-wise stock report table + Excel download |
 | `components/reports/DateRangeSelector.tsx` | From/To date inputs + Generate button |
-| `components/shared/ProfileProvider.tsx` | React context — fetches profile once, shared app-wide |
+| `components/shared/ProfileProvider.tsx` | React context — fetches profile once (cached), shared app-wide |
+| `hooks/usePartySuggestions.ts` | Party/supplier autocomplete source (suppliers setting + past entries, cached) |
+| `hooks/useSettings.ts` | Loads admin dropdown lists (cached, stale-while-revalidate) |
+| `supabase/03_stock_out_simplify.sql` | Migration: party_name nullable + seed supplier_options |
+| `lib/supabase/client.ts` | Singleton browser Supabase client |
 
 ---
 

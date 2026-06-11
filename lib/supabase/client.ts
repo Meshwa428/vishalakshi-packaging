@@ -1,8 +1,15 @@
 import { createBrowserClient } from "@supabase/ssr"
 
+// Singleton — one browser client for the whole app. Creating a new client on
+// every call spins up duplicate auth listeners and token-refresh timers, which
+// adds latency and redundant network chatter on each page.
+let browserClient: ReturnType<typeof createBrowserClient> | undefined
+
 export function createClient() {
-  return createBrowserClient(
+  if (browserClient) return browserClient
+  browserClient = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
   )
+  return browserClient
 }

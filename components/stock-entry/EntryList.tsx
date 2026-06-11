@@ -75,7 +75,7 @@ export function EntryList({ entries, isAdmin, loading }: EntryListProps) {
     return entries.filter((e) => {
       if (q && !(
         e.invoice_number.toLowerCase().includes(q) ||
-        e.party_name.toLowerCase().includes(q) ||
+        (e.party_name?.toLowerCase().includes(q) ?? false) ||
         (e.truck_number?.toLowerCase().includes(q) ?? false)
       )) return false
       if (typeFilter !== "all" && e.entry_type !== typeFilter) return false
@@ -239,7 +239,7 @@ export function EntryList({ entries, isAdmin, loading }: EntryListProps) {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-mono font-semibold text-base leading-tight">{entry.invoice_number}</p>
-                    <p className="text-sm text-muted-foreground mt-0.5 truncate">{entry.party_name}</p>
+                    <p className="text-sm text-muted-foreground mt-0.5 truncate">{entry.party_name || "—"}</p>
                   </div>
                   <div className="flex flex-col items-end gap-1.5 shrink-0">
                     <TypePill type={entry.entry_type} />
@@ -300,7 +300,7 @@ export function EntryList({ entries, isAdmin, loading }: EntryListProps) {
                   >
                     <td className="py-3 px-4 font-mono font-medium">{entry.invoice_number}</td>
                     <td className="py-3 px-4 text-muted-foreground whitespace-nowrap">{formatDate(entry.date)}</td>
-                    <td className="py-3 px-4">{entry.party_name}</td>
+                    <td className="py-3 px-4">{entry.party_name || <span className="text-muted-foreground">—</span>}</td>
                     <td className="py-3 px-4 hidden md:table-cell">
                       {entry.truck_number ? (
                         <Badge variant="secondary">{entry.truck_number}</Badge>
