@@ -7,12 +7,12 @@ export const logger = {
     if (!isEnabled()) return
     console.log(`[${ts()}] [INFO] ${msg}`, data !== undefined ? data : '')
   },
+  // warn/error always log (ENABLE_DEBUG_LOGS only gates info/debug) so
+  // production failures — e.g. a cron backup failing — show up in Vercel logs.
   warn: (msg: string, data?: unknown) => {
-    if (!isEnabled()) return
     console.warn(`[${ts()}] [WARN] ${msg}`, data !== undefined ? data : '')
   },
   error: (msg: string, data?: unknown) => {
-    if (!isEnabled()) return
     console.error(`[${ts()}] [ERROR] ${msg}`, data !== undefined ? data : '')
   },
   debug: (msg: string, data?: unknown) => {

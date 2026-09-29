@@ -80,7 +80,7 @@ Update after every major change so future debugging sessions have full context.
 - **Layout is still server**: `(dashboard)/layout.tsx` remains a server component for the initial session cookie check (fast — no DB query). Only the children are client components.
 
 ### [2026-05-26] Logging System
-- **Gate**: `ENABLE_DEBUG_LOGS=true` enables logs. Default `false` (silent in production).
+- **Gate**: `ENABLE_DEBUG_LOGS=true` enables info/debug logs. warn/error always log.
 - **File**: `lib/logger.ts` — levels: info, warn, error, debug
 - **Coverage**: Auth, page loads, form submit, DB errors, cron, email sends
 
@@ -140,7 +140,8 @@ Update after every major change so future debugging sessions have full context.
   - Inserts require `created_by = auth.uid()`; item inserts only into your own entry (admins: any).
   - `anon` has no table privileges; `authenticated` has only what the policies need.
 - **Auth**: public sign-ups disabled in Supabase (the app never calls `signUp`; with it on, anyone could self-register as operator).
-- **Backups email**: Resend test sender `onboarding@resend.dev` can only deliver to the Resend account owner's address — verify a domain in Resend to send elsewhere. Hobby cron timing is hourly-precision (23:30 UTC job fires 23:00–23:59).
+- **Backups email**: Resend test sender `onboarding@resend.dev` can only deliver to the Resend account owner's address (`BACKUP_EMAIL=loopify8@gmail.com`) — verify a domain in Resend to send elsewhere. Hobby cron timing is hourly-precision (23:30 UTC job fires 23:00–23:59).
+- **Logging**: `logger.warn`/`logger.error` now always log; `ENABLE_DEBUG_LOGS` only gates `info`/`debug`. Previously errors were silent in production, which hid the first failed backup.
 
 ---
 
