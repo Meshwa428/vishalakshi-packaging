@@ -10,9 +10,10 @@ export const maxDuration = 60
 export async function GET(req: Request) {
   logger.info("Monthly report backup cron triggered")
 
+  // Verify cron secret (fail closed: reject if CRON_SECRET is not configured)
   const authHeader = req.headers.get("authorization")
   const cronSecret = process.env.CRON_SECRET
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     logger.warn("Monthly backup: unauthorized request")
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }

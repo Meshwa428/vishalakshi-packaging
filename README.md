@@ -61,17 +61,18 @@ A web app for managing stock in/out entries and generating reel-wise stock repor
 ```bash
 git clone <repo-url>
 cd vishalakshi-packaging
-npm install
+pnpm install
 ```
 
 ### 2. Set up Supabase
 
 1. Create a project at [supabase.com](https://supabase.com)
-2. Go to **SQL Editor** and run `supabase/01_schema.sql`
-3. Go to **Authentication → Users** and create 3 users manually:
+2. Go to **SQL Editor** and run `supabase/01_schema.sql` (complete schema — see `supabase/README.md`)
+3. Go to **Authentication → Users** and create 3 users manually (tick "Auto Confirm User"):
    - Two admins (any email + password)
    - One operator (any email + password)
-4. Run the role-assignment SQL from `supabase/02_users_setup.sql` (update emails to match what you created)
+4. Promote the two admins with the `UPDATE profiles …` snippet at the bottom of `01_schema.sql`
+5. **Authentication → Sign In / Providers** → turn off **"Allow new users to sign up"**. The app never signs users up; leaving it on lets anyone create an operator account.
 
 ### 3. Create `.env.local`
 
@@ -92,7 +93,7 @@ Get the Supabase keys from **Dashboard → Settings → API**.
 ### 4. Run locally
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) — you'll be redirected to the login page.

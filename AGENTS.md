@@ -129,6 +129,19 @@ Update after every major change so future debugging sessions have full context.
 ### [2026-06-11] Reel-row animations removed
 - The framer-motion enter/exit/layout animations on reel rows (`ItemRow`, `StockOutItemRow`) and their `AnimatePresence` wrappers in both forms were removed per request — adding/removing rows is now instant. `EntryList` animations are unchanged.
 
+### [2026-09-30] Production deploy (Vercel) + DB hardening
+- **Hosting**: Vercel project `vishalakshi-packaging` (Hobby, team `meshwa428s-projects`), Git-connected to GitHub `Meshwa428/vishalakshi-packaging` — every push to `master` deploys to production. Env vars live in Vercel (secrets stored as Sensitive). Supabase project ref `tsctduqjmbxbpywpajnq`.
+- **Cron bug fixed**: `proxy.ts` matcher now excludes `api/cron`. Previously the auth guard 307-redirected Vercel Cron's cookie-less requests to `/login`, so backups silently never ran. Cron routes now **fail closed** — they reject when `CRON_SECRET` is unset (they used to skip the check).
+- **Package manager**: pnpm only. Stale `package-lock.json` removed; `pnpm-workspace.yaml` `allowBuilds` placeholders set to `true`.
+- **Schema**: `supabase/01_schema.sql` rewritten as the complete, re-runnable schema (the old file lacked Stock Out tables, `status` columns and the invoice trigger). Applied to prod as migrations `initial_schema`, `drop_legacy_stock_out_policies`, `tighten_authenticated_table_grants`.
+- **RLS hardening**:
+  - Removed `profiles_update_own` — it let an operator set their own `role` to `admin`. `profiles` is now read-only via the API (all signed-in users can read, for "Created By"); roles change via SQL only.
+  - Policies use `TO authenticated` (not deprecated `auth.role()`), admin checks go through `private.is_admin()` (non-exposed schema).
+  - Inserts require `created_by = auth.uid()`; item inserts only into your own entry (admins: any).
+  - `anon` has no table privileges; `authenticated` has only what the policies need.
+- **Auth**: public sign-ups disabled in Supabase (the app never calls `signUp`; with it on, anyone could self-register as operator).
+- **Backups email**: Resend test sender `onboarding@resend.dev` can only deliver to the Resend account owner's address — verify a domain in Resend to send elsewhere. Hobby cron timing is hourly-precision (23:30 UTC job fires 23:00–23:59).
+
 ---
 
 ## Key File Map
